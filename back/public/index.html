@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NoiseGuard — Monitor de Ruído</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header>
+  <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+    <circle cx="14" cy="14" r="13" stroke="#F5A623" stroke-width="2"/>
+    <path d="M9 18V10l6 4-6 4z" fill="#F5A623"/>
+    <path d="M18 10c2 1.3 3.3 3.2 3.3 4s-1.3 2.7-3.3 4" stroke="#F5A623" stroke-width="1.5" stroke-linecap="round"/>
+  </svg>
+  <h1>NoiseGuard</h1>
+  <span class="subtitle">Monitor de Ruído em Tempo Real</span>
+  <span style="margin-left:auto;font-size:0.78rem;color:var(--text-muted)">
+    <span class="conn-dot" id="conn-dot"></span><span id="conn-label">Conectado</span>
+  </span>
+</header>
+
+<div class="container">
+
+  <!-- Top row: gauge + right column -->
+  <div class="top-row">
+
+    <!-- Circular gauge -->
+    <div class="gauge-wrap">
+      <svg id="gauge-svg" width="180" height="110" viewBox="0 0 180 110">
+        <!-- Background arc -->
+        <path id="gauge-bg" d="" stroke="#2A4F72" stroke-width="14" fill="none" stroke-linecap="round"/>
+        <!-- Value arc -->
+        <path id="gauge-fill" d="" stroke="#F5A623" stroke-width="14" fill="none" stroke-linecap="round"
+              style="transition: stroke-dashoffset 0.4s ease, stroke 0.3s"/>
+        <!-- Tick marks will be drawn by JS -->
+        <g id="gauge-ticks"></g>
+      </svg>
+      <div class="gauge-value"><span id="gauge-db">--</span></div>
+      <div class="gauge-unit">dB atual</div>
+    </div>
+
+    <!-- Right column -->
+    <div class="right-col">
+      <div class="badge-wrap">
+        <label>Status</label>
+        <span id="status-badge" class="OK">--</span>
+        <label style="margin-left:auto">
+          <span class="sound-toggle">
+            <input type="checkbox" id="sound-toggle" />
+            Alerta sonoro
+          </span>
+        </label>
+      </div>
+
+      <div class="stat-cards">
+        <div class="card">
+          <div class="label">Atual</div>
+          <div class="value" id="stat-current">--</div>
+          <div class="unit">dB</div>
+        </div>
+        <div class="card">
+          <div class="label">Média</div>
+          <div class="value" id="stat-avg">--</div>
+          <div class="unit">dB</div>
+        </div>
+        <div class="card">
+          <div class="label">Pico</div>
+          <div class="value" id="stat-peak">--</div>
+          <div class="unit">dB</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Historical chart -->
+  <div class="chart-panel">
+    <div class="panel-title">Histórico — últimos 60 s</div>
+    <canvas id="history-chart"></canvas>
+  </div>
+
+  <!-- Events table -->
+  <div class="events-panel">
+    <div class="panel-title">Eventos de ultrapassagem (últimos 10)</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Horário</th>
+          <th>dB</th>
+          <th>Nível</th>
+        </tr>
+      </thead>
+      <tbody id="events-body">
+        <tr><td colspan="3" style="color:var(--text-muted);text-align:center">Aguardando dados…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="dashboard.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(node server/index.js)",
+      "Bash(curl -s -X POST http://localhost:3000/api/noise -H 'Content-Type: application/json' -d '{\"db\":75}')",
+      "Bash(curl -s -X POST http://localhost:3000/api/noise -H 'Content-Type: application/json' -d '{\"db\":45}')",
+      "Bash(curl -s http://localhost:3000/api/history)",
+      "Bash(kill %1)",
+      "Bash(node -e ' *)"
+    ]
+  }
+}
