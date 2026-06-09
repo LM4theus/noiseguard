@@ -1,0 +1,51 @@
+menu "NoiseGuard - Configuracao de Hardware"
+
+    config NG_CONFIG_BUTTON_GPIO
+        int "GPIO do botao de configuracao (ativo em zero)"
+        default 4
+        range 0 39
+        help
+            GPIO ligado ao botao que entra no modo de configuracao.
+            O botao deve ligar o pino ao GND (ativo em zero). O pull-up
+            interno e habilitado automaticamente.
+            EVITE GPIO0: nivel baixo no boot coloca a ROM em modo download.
+
+    config NG_ADC_CHANNEL
+        int "Canal ADC1 do sensor analogico"
+        default 6
+        range 0 7
+        help
+            Canal do ADC1 onde o sinal analogico (microfone) esta ligado.
+            Canal 6 = GPIO34 (entrada apenas, ideal para sensor).
+            Tabela: 0=GPIO36 1=GPIO37 2=GPIO38 3=GPIO39 4=GPIO32
+            5=GPIO33 6=GPIO34 7=GPIO35
+
+    config NG_AP_SSID
+        string "SSID do AP no modo de configuracao"
+        default "NoiseGuard-Setup"
+
+    config NG_AP_PASSWORD
+        string "Senha do AP no modo de configuracao (>=8 chars, vazio = aberto)"
+        default "noiseguard"
+
+    config NG_DEFAULT_SERVER_HOST
+        string "Host/IP padrao do servidor"
+        default "192.168.0.100"
+
+    config NG_DEFAULT_SERVER_PORT
+        int "Porta padrao do servidor"
+        default 3000
+
+    config NG_DEFAULT_SERVER_PATH
+        string "Caminho (endpoint) padrao no servidor"
+        default "/api/noise"
+
+    config NG_DEFAULT_DEVICE_ID
+        int "Device ID padrao"
+        default 10034
+
+    config NG_DEFAULT_INTERVAL_MS
+        int "Intervalo de envio padrao (ms)"
+        default 500
+
+endmenu

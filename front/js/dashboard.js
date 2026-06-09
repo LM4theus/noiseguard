@@ -2,6 +2,7 @@ import { connect, fetchHistory } from './api.js';
 import { updateGauge }          from './gauge.js';
 import { initChart, pushPoint, loadHistory } from './chart.js';
 import { startMicrophone, stopMicrophone, isMicActive } from './microphone.js';
+import './theme.js';
 
 const MAX_EVENTS = 10;
 

@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NoiseGuard</title>
   <link rel="stylesheet" href="css/style.css">
+  <!-- Aplica o tema salvo antes da pintura (evita flash) -->
+  <script>
+    document.documentElement.setAttribute(
+      'data-theme',
+      localStorage.getItem('theme') || 'dark'
+    );
+  </script>
 </head>
 <body>
   <header class="header">
@@ -16,6 +23,7 @@
       </div>
       <button class="alert-toggle" id="alert-toggle">🔔 Alerta ON</button>
       <button class="mic-btn" id="btn-mic" title="Modo Teste: Microfone">🎤 Microfone OFF</button>
+      <button class="theme-btn" id="btn-theme" title="Alternar tema Dark / White">🌙</button>
     </div>
   </header>
 
@@ -26,7 +34,7 @@
           <!-- Background arc: 270° from 135° to 405°(=45°) clockwise -->
           <path class="gauge-bg"
             d="M 39.9 160.1 A 85 85 0 1 1 160.1 160.1"
-            fill="none" stroke="#243447" stroke-width="14" stroke-linecap="round"/>
+            fill="none" stroke-width="14" stroke-linecap="round"/>
           <!-- Progress arc -->
           <path id="gauge-arc" class="gauge-arc"
             d="M 39.9 160.1 A 85 85 0 1 1 160.1 160.1"

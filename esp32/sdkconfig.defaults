@@ -1,0 +1,16 @@
+# Partition table com NVS dedicado para guardar a configuracao
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# Stack maior para a task principal (WiFi + HTTP + ADC)
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+
+# Habilita o modo SoftAP usado no portal de configuracao
+CONFIG_ESP_WIFI_SOFTAP_SUPPORT=y
+
+# HTTP server: aceita corpos/headers um pouco maiores (formulario de config)
+CONFIG_HTTPD_MAX_REQ_HDR_LEN=1024
+CONFIG_HTTPD_MAX_URI_LEN=512
+
+# Log padrao em nivel INFO
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y

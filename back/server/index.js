@@ -55,6 +55,13 @@ store.emitter.on('data', (point) => {
 
 const server = http.createServer(app);
 
+// Mantém conexões keep-alive vivas bem mais que o intervalo de envio da ESP32.
+// O padrão do Node (5s) colide com loops de envio de ~5s: o servidor fecha o
+// socket ocioso no exato momento em que a ESP tenta reusá-lo, causando
+// ESP_ERR_HTTP_CONNECT / "select() timeout" / "sock < 0" no cliente.
+server.keepAliveTimeout = 65000; // 65s
+server.headersTimeout   = 66000; // deve ser > keepAliveTimeout
+
 const wss = new WebSocket.Server({ server, path: '/ws' });
 
 wss.on('connection', (ws, req) => {
