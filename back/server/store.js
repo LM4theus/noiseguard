@@ -1,37 +1,44 @@
 const EventEmitter = require('events');
 
-const CAPACITY = 120;
+const CAPACITY = 120; // pontos retidos por dispositivo (sem persistência)
 
 const emitter = new EventEmitter();
-const buffer = [];
-let head = 0;
-let size = 0;
 
-function add(point) {
-  if (size < CAPACITY) {
-    buffer[head] = point;
-    head = (head + 1) % CAPACITY;
-    size++;
-  } else {
-    buffer[head] = point;
-    head = (head + 1) % CAPACITY;
+// deviceId -> buffer circular { buf, head, size }
+const buffers = new Map();
+
+function bufferFor(deviceId) {
+  let b = buffers.get(deviceId);
+  if (!b) {
+    b = { buf: [], head: 0, size: 0 };
+    buffers.set(deviceId, b);
   }
-  emitter.emit('data', point);
+  return b;
 }
 
-function getAll() {
-  if (size < CAPACITY) return buffer.slice(0, size);
-  const tail = head;
-  return [...buffer.slice(tail), ...buffer.slice(0, tail)];
+function add(deviceId, point) {
+  const b = bufferFor(deviceId);
+  b.buf[b.head] = point;
+  b.head = (b.head + 1) % CAPACITY;
+  if (b.size < CAPACITY) b.size++;
+  emitter.emit('data', { deviceId, point });
 }
 
-function getLast() {
-  if (size === 0) return null;
-  return buffer[(head - 1 + CAPACITY) % CAPACITY];
+function getAll(deviceId) {
+  const b = buffers.get(deviceId);
+  if (!b || b.size === 0) return [];
+  if (b.size < CAPACITY) return b.buf.slice(0, b.size);
+  return [...b.buf.slice(b.head), ...b.buf.slice(0, b.head)];
 }
 
-function getStats() {
-  const all = getAll();
+function getLast(deviceId) {
+  const b = buffers.get(deviceId);
+  if (!b || b.size === 0) return null;
+  return b.buf[(b.head - 1 + CAPACITY) % CAPACITY];
+}
+
+function getStats(deviceId) {
+  const all = getAll(deviceId);
   if (all.length === 0) return { avg: 0, peak: 0, current: 0 };
   const values = all.map(p => p.db);
   const avg = values.reduce((a, b) => a + b, 0) / values.length;

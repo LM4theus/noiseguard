@@ -3,7 +3,9 @@ const path = require('path');
 const express = require('express');
 const WebSocket = require('ws');
 const store = require('./store');
+const { ingest } = require('./ingest');
 const noiseRouter = require('./routes/noise');
+const devicesRouter = require('./routes/devices');
 
 const PORT = process.env.PORT || 3000;
 const app = express();
@@ -20,6 +22,7 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '..', '..', 'front', 'index.html'));
 });
 app.use('/api', noiseRouter);
+app.use('/api', devicesRouter);
 
 // SSE clients list
 const sseClients = [];
@@ -30,6 +33,8 @@ app.get('/events', (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
 
+  // Sem ?deviceId, o cliente recebe leituras de todos os dispositivos.
+  res.deviceId = req.query.deviceId || null;
   sseClients.push(res);
 
   req.on('close', () => {
@@ -38,16 +43,19 @@ app.get('/events', (req, res) => {
   });
 });
 
-// Broadcast to SSE and WebSocket clients on every new reading
-store.emitter.on('data', (point) => {
+// Broadcast por dispositivo para clientes SSE e WebSocket (browser).
+store.emitter.on('data', ({ deviceId, point }) => {
   const payload = JSON.stringify(point);
 
   for (const client of sseClients) {
-    client.write(`data: ${payload}\n\n`);
+    if (!client.deviceId || client.deviceId === deviceId) {
+      client.write(`data: ${payload}\n\n`);
+    }
   }
 
   for (const ws of wss.clients) {
-    if (ws.readyState === WebSocket.OPEN && ws._isBrowser) {
+    if (ws.readyState === WebSocket.OPEN && ws._isBrowser &&
+        (!ws._deviceId || ws._deviceId === deviceId)) {
       ws.send(payload);
     }
   }
@@ -65,20 +73,21 @@ server.headersTimeout   = 66000; // deve ser > keepAliveTimeout
 const wss = new WebSocket.Server({ server, path: '/ws' });
 
 wss.on('connection', (ws, req) => {
-  // Distinguish browser clients (no custom header) from ESP32 by query param
+  // Distingue clientes browser (apenas recebem) dos dispositivos (enviam).
   const url = new URL(req.url, `http://localhost`);
-  const isBrowser = url.searchParams.get('client') === 'browser';
-  ws._isbrowser = isBrowser;
+  ws._isBrowser = url.searchParams.get('client') === 'browser';
+  ws._deviceId  = url.searchParams.get('deviceId') || null;
 
   ws.on('message', (raw) => {
+    if (ws._isBrowser) return; // browser não ingere leituras
     try {
-      const { db, timestamp } = JSON.parse(raw.toString());
-      if (typeof db !== 'number' || db < 0 || db > 140) return;
-
-      const { classify } = require('./alerts');
-      const level = classify(db);
-      const point = { db, timestamp: timestamp || Date.now(), level };
-      store.add(point);
+      const msg = JSON.parse(raw.toString());
+      // deviceId pode vir na mensagem ou na query da conexão.
+      ingest({
+        deviceId: msg.deviceId ?? ws._deviceId,
+        db: msg.db,
+        timestamp: msg.timestamp,
+      });
     } catch (_) {}
   });
 });

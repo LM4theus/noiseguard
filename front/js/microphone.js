@@ -4,7 +4,7 @@ let analyser   = null;
 let intervalId = null;
 let active     = false;
 
-export async function startMicrophone({ onPermissionDenied } = {}) {
+export async function startMicrophone({ onPermissionDenied, deviceId = null } = {}) {
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     audioCtx = new AudioContext();
@@ -28,7 +28,7 @@ export async function startMicrophone({ onPermissionDenied } = {}) {
       fetch('http://localhost:3000/api/noise', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ db: dbClamped }),
+        body: JSON.stringify(deviceId ? { deviceId, db: dbClamped } : { db: dbClamped }),
       });
     }, 500);
   } catch (_) {

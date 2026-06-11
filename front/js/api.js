@@ -5,24 +5,33 @@ const POLL_INTERVAL_MS = 1000;
 
 let onMessageCb = null;
 let onStatusCb = null;
+let deviceParam = null;
 let sseFailures = 0;
 let pollingTimer = null;
 let source = null;
 
-export function connect(onMessage, onStatus) {
+// deviceId opcional: assina apenas o feed daquele dispositivo.
+export function connect(onMessage, onStatus, deviceId = null) {
   onMessageCb = onMessage;
   onStatusCb = onStatus;
+  deviceParam = deviceId;
   openSSE();
 }
 
-export async function fetchHistory() {
-  const res = await fetch(`${BASE}/api/history`);
+function historyUrl(deviceId) {
+  const q = deviceId ? `?deviceId=${encodeURIComponent(deviceId)}` : '';
+  return `${BASE}/api/history${q}`;
+}
+
+export async function fetchHistory(deviceId = null) {
+  const res = await fetch(historyUrl(deviceId));
   return res.json();
 }
 
 function openSSE() {
   onStatusCb('connecting');
-  source = new EventSource(`${BASE}/events`);
+  const q = deviceParam ? `?deviceId=${encodeURIComponent(deviceParam)}` : '';
+  source = new EventSource(`${BASE}/events${q}`);
 
   source.onopen = () => {
     sseFailures = 0;
@@ -62,7 +71,7 @@ function startPolling() {
   stopPolling();
   pollingTimer = setInterval(async () => {
     try {
-      const res = await fetch(`${BASE}/api/history`);
+      const res = await fetch(historyUrl(deviceParam));
       const data = await res.json();
       if (data.length > 0) {
         onMessageCb(data[data.length - 1]);

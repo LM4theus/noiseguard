@@ -1,24 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const store = require('../store');
-const { classify } = require('../alerts');
+const { ingest, DEFAULT_DEVICE_ID } = require('../ingest');
 
 router.post('/noise', (req, res) => {
-  const { db, timestamp } = req.body;
-
-  if (typeof db !== 'number' || db < 0 || db > 140) {
-    return res.status(400).json({ error: 'db must be a number between 0 and 140' });
-  }
-
-  const level = classify(db);
-  const point = { db, timestamp: timestamp || Date.now(), level };
-  store.add(point);
-
-  res.json({ status: 'ok', level });
+  const { deviceId, db, timestamp } = req.body;
+  const result = ingest({ deviceId, db, timestamp });
+  if (!result.ok) return res.status(result.code).json({ error: result.error });
+  res.json({ status: 'ok', deviceId: result.deviceId, level: result.level });
 });
 
 router.get('/history', (req, res) => {
-  res.json(store.getAll());
+  const deviceId = req.query.deviceId || DEFAULT_DEVICE_ID;
+  res.json(store.getAll(deviceId));
 });
 
 module.exports = router;

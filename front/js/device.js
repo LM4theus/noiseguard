@@ -2,6 +2,7 @@ import { connect, fetchHistory } from './api.js';
 import { updateGauge }          from './gauge.js';
 import { initChart, pushPoint, loadHistory } from './chart.js';
 import { startMicrophone, stopMicrophone, isMicActive } from './microphone.js';
+import { loadRegistry, findDevice } from './data.js';
 import './theme.js';
 
 const MAX_EVENTS = 10;
@@ -11,6 +12,26 @@ let events       = [];
 let lastLevel    = null;
 let lastTimestamp = null;
 let audioCtx     = null;
+
+// ── Identifica o dispositivo pela query (?id=) ─────────────────
+const deviceId    = new URLSearchParams(location.search).get('id');
+const backLink    = document.getElementById('back-link');
+const deviceTitle = document.getElementById('device-title');
+
+async function identifyDevice() {
+  try {
+    await loadRegistry();
+    const found = findDevice(deviceId);
+    if (found) {
+      document.title = `NoiseGuard — ${found.device.name}`;
+      deviceTitle.textContent = found.device.name;
+      backLink.textContent = `← ${found.env.name}`;
+      backLink.href = `environment.html?id=${found.env.id}`;
+      return;
+    }
+  } catch (_) { /* mantém título genérico se o registro não carregar */ }
+  deviceTitle.textContent = 'Dispositivo';
+}
 
 // ── DOM refs ───────────────────────────────────────────────────
 const connDot     = document.getElementById('conn-dot');
@@ -56,6 +77,7 @@ btnMic.addEventListener('click', async () => {
   } else {
     await startMicrophone({
       onPermissionDenied: () => renderMicBtn('error'),
+      deviceId,
     });
     if (isMicActive()) renderMicBtn('on');
   }
@@ -182,11 +204,12 @@ function onPoint(point) {
 
 // ── Bootstrap ─────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
+  identifyDevice();
   initChart(document.getElementById('noise-chart'));
-  connect(onPoint, setConnectionStatus);
+  connect(onPoint, setConnectionStatus, deviceId);
 
   try {
-    const history = await fetchHistory();
+    const history = await fetchHistory(deviceId);
     if (history.length > 0) {
       loadHistory(history);
       statsBuffer = history.slice(-60).map(p => p.db);

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NoiseGuard — Dispositivo</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    document.documentElement.setAttribute(
+      'data-theme',
+      localStorage.getItem('theme') || 'dark'
+    );
+  </script>
+</head>
+<body>
+  <header class="header">
+    <a class="header-logo" href="index.html">🔊 NoiseGuard <span class="header-sub">— Dispositivo</span></a>
+    <div class="header-right">
+      <div class="conn-pill">
+        <span class="conn-dot" id="conn-dot"></span>
+        <span id="conn-text">CONECTANDO...</span>
+      </div>
+      <button class="alert-toggle" id="alert-toggle">🔔 Alerta ON</button>
+      <button class="mic-btn" id="btn-mic" title="Modo Teste: Microfone">🎤 Microfone OFF</button>
+      <button class="theme-btn" id="btn-theme" title="Alternar tema Dark / White">🌙</button>
+    </div>
+  </header>
+
+  <div class="device-bar">
+    <a class="back-link" id="back-link" href="index.html">← Ambientes</a>
+    <h1 class="device-title" id="device-title">Dispositivo</h1>
+  </div>
+
+  <main class="main-grid">
+    <aside class="sidebar">
+      <div class="gauge-wrap">
+        <svg class="gauge-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <path class="gauge-bg"
+            d="M 39.9 160.1 A 85 85 0 1 1 160.1 160.1"
+            fill="none" stroke-width="14" stroke-linecap="round"/>
+          <path id="gauge-arc" class="gauge-arc"
+            d="M 39.9 160.1 A 85 85 0 1 1 160.1 160.1"
+            fill="none" stroke="#27AE60" stroke-width="14" stroke-linecap="round"
+            stroke-dasharray="0 999"/>
+          <text id="gauge-value" x="100" y="95"
+            text-anchor="middle" dominant-baseline="middle"
+            class="gauge-value">0</text>
+          <text x="100" y="120"
+            text-anchor="middle"
+            class="gauge-unit">dB</text>
+        </svg>
+      </div>
+
+      <div class="badge ok" id="status-badge">
+        <span id="badge-icon">✅</span>
+        <span id="badge-text">AMBIENTE OK</span>
+      </div>
+    </aside>
+
+    <section class="content-area">
+      <div class="cards">
+        <div class="card">
+          <div class="card-label">Atual</div>
+          <div class="card-value" id="stat-current">—</div>
+          <div class="card-unit">dB</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Média</div>
+          <div class="card-value" id="stat-avg">—</div>
+          <div class="card-unit">dB</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Pico</div>
+          <div class="card-value" id="stat-peak">—</div>
+          <div class="card-unit">dB</div>
+        </div>
+      </div>
+
+      <div class="chart-wrap">
+        <canvas id="noise-chart"></canvas>
+      </div>
+    </section>
+  </main>
+
+  <section class="events-section">
+    <h2 class="events-title">Eventos de Limiar</h2>
+    <table class="events-table">
+      <thead>
+        <tr>
+          <th>Horário</th>
+          <th>Nível (dB)</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="events-tbody">
+        <tr class="events-empty">
+          <td colspan="3">Nenhum evento registrado</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <script type="module" src="js/device.js"></script>
+</body>
+</html>

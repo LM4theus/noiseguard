@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NoiseGuard — Gestão de dispositivos</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    document.documentElement.setAttribute(
+      'data-theme',
+      localStorage.getItem('theme') || 'dark'
+    );
+  </script>
+</head>
+<body>
+  <header class="header">
+    <a class="header-logo" href="index.html">🔊 NoiseGuard</a>
+    <div class="header-right">
+      <div class="conn-pill">
+        <span class="conn-dot" id="conn-dot"></span>
+        <span id="conn-text">CONECTANDO...</span>
+      </div>
+      <button class="theme-btn" id="btn-theme" title="Alternar tema Dark / White">🌙</button>
+    </div>
+  </header>
+
+  <main class="page">
+    <a class="back-link" href="index.html">← Ambientes</a>
+
+    <div class="page-head page-head-row">
+      <div>
+        <h1 class="page-title">Gestão de dispositivos</h1>
+        <p class="page-subtitle">Cadastre e configure o DeviceID e os parâmetros de cada sensor.</p>
+      </div>
+      <button class="btn-primary" id="btn-new">+ Novo dispositivo</button>
+    </div>
+
+    <div class="mgmt-layout">
+      <!-- Tabela de dispositivos -->
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>DeviceID</th>
+              <th>Nome</th>
+              <th>Ambiente</th>
+              <th>Atenção</th>
+              <th>Crítico</th>
+              <th>Intervalo</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="devices-tbody">
+            <tr><td colspan="8" class="table-empty">Carregando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Formulário (cadastro/edição) -->
+      <aside class="form-panel" id="form-panel" hidden>
+        <div class="form-panel-head">
+          <h2 id="form-title">Novo dispositivo</h2>
+          <button class="icon-btn" id="form-close" title="Fechar">✕</button>
+        </div>
+
+        <form id="device-form" novalidate>
+          <label class="field">
+            <span>DeviceID</span>
+            <input name="id" id="f-id" placeholder="ex.: sala-101" autocomplete="off">
+            <small class="field-hint">2–32 caracteres: letras, números, _ ou -. Não pode mudar depois.</small>
+          </label>
+
+          <label class="field">
+            <span>Nome</span>
+            <input name="name" id="f-name" placeholder="ex.: Sala 101" autocomplete="off">
+          </label>
+
+          <label class="field">
+            <span>Ambiente</span>
+            <select name="envId" id="f-env"></select>
+          </label>
+
+          <div class="field-row">
+            <label class="field">
+              <span>Limiar atenção (dB)</span>
+              <input name="warnThreshold" id="f-warn" type="number" min="0" max="140" step="1">
+            </label>
+            <label class="field">
+              <span>Limiar crítico (dB)</span>
+              <input name="critThreshold" id="f-crit" type="number" min="0" max="140" step="1">
+            </label>
+          </div>
+
+          <div class="field-row">
+            <label class="field">
+              <span>dB base (simulação)</span>
+              <input name="base" id="f-base" type="number" min="0" max="140" step="1">
+            </label>
+            <label class="field">
+              <span>Intervalo (ms)</span>
+              <input name="intervalMs" id="f-interval" type="number" min="100" max="60000" step="100">
+            </label>
+          </div>
+
+          <label class="field field-check">
+            <input name="active" id="f-active" type="checkbox" checked>
+            <span>Dispositivo ativo</span>
+          </label>
+
+          <p class="form-errors" id="form-errors" hidden></p>
+
+          <div class="form-actions">
+            <button type="button" class="btn-ghost" id="form-cancel">Cancelar</button>
+            <button type="submit" class="btn-primary" id="form-save">Salvar</button>
+          </div>
+        </form>
+      </aside>
+    </div>
+  </main>
+
+  <script type="module" src="js/header.js"></script>
+  <script type="module" src="js/devices.js"></script>
+</body>
+</html>

@@ -39,8 +39,10 @@ Configure o firmware do ESP32 com:
 | URL | `http://<IP_DA_MÁQUINA>:3000/api/noise` |
 | Método | POST |
 | Content-Type | application/json |
-| Body | `{"db": <LEITURA_DO_SENSOR>}` |
+| Body | `{"deviceId": "<DEVICE_ID>", "db": <LEITURA_DO_SENSOR>}` |
 | Intervalo | 500 ms |
+
+O `deviceId` deve corresponder a um dispositivo cadastrado na tela **⚙️ Dispositivos**. A leitura é roteada para aquele dispositivo e classificada pelos limiares dele. Se o `deviceId` for omitido, a leitura cai no dispositivo virtual `default` (compatibilidade com firmware legado); se for informado mas não existir no registro, a resposta é **404**.
 
 Para descobrir o IP da máquina na rede Wi-Fi: `ip a` (Linux/Mac) ou `ipconfig` (Windows).
 
@@ -49,8 +51,8 @@ Para descobrir o IP da máquina na rede Wi-Fi: `ip a` (Linux/Mac) ou `ipconfig` 
 ```bash
 curl -X POST http://localhost:3000/api/noise \
   -H "Content-Type: application/json" \
-  -d '{"db": 112}'
-# {"status":"ok","level":"CRITICO"}
+  -d '{"deviceId": "comp", "db": 97}'
+# {"status":"ok","deviceId":"comp","level":"CRITICO"}
 ```
 
 ---
@@ -65,10 +67,13 @@ back/
   server/
     index.js    ← servidor Express + WebSocket + SSE
     routes/
-      noise.js  ← rotas REST (/api/noise, /api/history)
-    store.js    ← buffer circular em memória (120 pontos)
-    alerts.js   ← classificação dos níveis de ruído
-    simulator.js← gerador de leituras fake (fallback)
+      noise.js  ← rotas de leitura (/api/noise, /api/history)
+      devices.js← CRUD do registro (/api/registry, /api/devices)
+    ingest.js   ← ingestão compartilhada (valida + resolve deviceId + classifica)
+    registry.js ← registro persistente de ambientes/dispositivos (data/registry.json)
+    store.js    ← buffer circular em memória, por dispositivo (120 pontos cada)
+    alerts.js   ← classificação dos níveis (limiares por dispositivo)
+    simulator.js← gerador de leituras fake (fallback; aceita DEVICE_ID)
 ```
 
 O servidor Express (porta 3000) serve os arquivos de `front/` como arquivos estáticos. Não há processo separado para o frontend.
@@ -79,24 +84,25 @@ O servidor Express (porta 3000) serve os arquivos de `front/` como arquivos est�
 Fonte (microfone / ESP32 / curl)
         │
         ▼
-POST /api/noise  {"db": 97.3}
+POST /api/noise  {"deviceId": "comp", "db": 97.3}
         │
         ▼
-classify(db) → "ATENCAO"
+ingest() → resolve deviceId no registro → classify(db, limiares do dispositivo) → "CRITICO"
         │
         ▼
-store.add(point)  → buffer circular (máx. 120 pontos, sem persistência)
+store.add(deviceId, point)  → buffer circular POR dispositivo (máx. 120 pontos, sem persistência)
         │
         ▼
-emitter.emit('data', point)
+emitter.emit('data', { deviceId, point })
         │
    ┌────┴────┐
    ▼         ▼
 SSE         WebSocket
 /events     /ws
+(filtrados por ?deviceId)
    │
    ▼
-Dashboard atualiza gauge, gráfico e tabela de eventos
+Monitor do dispositivo atualiza gauge, gráfico e tabela de eventos
 ```
 
 ### Captura de áudio no browser
@@ -112,19 +118,19 @@ Dashboard atualiza gauge, gráfico e tabela de eventos
 
 `front/js/api.js` usa SSE como transporte principal:
 
-- Abre `EventSource /events` — o servidor mantém a conexão aberta e envia cada ponto novo
-- Se o SSE falhar 3 vezes seguidas, cai em modo de **polling HTTP** (GET `/api/history` a cada 1 s)
+- Abre `EventSource /events?deviceId=<id>` — o servidor mantém a conexão aberta e envia cada ponto novo daquele dispositivo
+- Se o SSE falhar 3 vezes seguidas, cai em modo de **polling HTTP** (GET `/api/history?deviceId=<id>` a cada 1 s)
 - Ao reconectar o SSE, o polling é cancelado automaticamente
 
 ### Buffer e histórico
 
-`store.js` mantém um buffer circular de 120 pontos em memória. Os dados são perdidos ao reiniciar o servidor. `GET /api/history` retorna todos os pontos na ordem cronológica.
+`store.js` mantém um buffer circular de 120 pontos **por dispositivo** em memória. Os dados são perdidos ao reiniciar o servidor. `GET /api/history?deviceId=<id>` retorna os pontos daquele dispositivo na ordem cronológica.
 
 ### Classificação de níveis
 
-Definida em `server/alerts.js`:
+Definida em `server/alerts.js`. Cada dispositivo tem seus próprios limiares (`warnThreshold` / `critThreshold`), configuráveis na tela de gestão. Para leituras sem dispositivo registrado, usa-se o padrão global:
 
-| Nível | Faixa | Cor |
+| Nível | Faixa (padrão) | Cor |
 |---|---|---|
 | OK | < 94 dB | Verde |
 | ATENÇÃO | 94 – 110 dB | Amarelo |
@@ -134,7 +140,10 @@ Definida em `server/alerts.js`:
 
 | Endpoint | Método | Descrição |
 | --- | --- | --- |
-| `/api/noise` | POST | Recebe leitura `{ "db": 97.3 }` |
-| `/api/history` | GET | Retorna os últimos 120 pontos |
-| `/events` | GET | Server-Sent Events (stream ao vivo) |
-| `/ws` | WS | WebSocket (ESP32 envia `{"db": ...}`) |
+| `/api/noise` | POST | Recebe leitura `{ "deviceId": "comp", "db": 97.3 }` (deviceId opcional → `default`) |
+| `/api/history` | GET | Retorna os pontos do dispositivo (`?deviceId=<id>`) |
+| `/api/registry` | GET | Ambientes + dispositivos cadastrados |
+| `/api/devices` | GET/POST | Lista / cria dispositivo |
+| `/api/devices/:id` | PUT/DELETE | Edita / remove dispositivo |
+| `/events` | GET | Server-Sent Events ao vivo (`?deviceId=<id>` para filtrar) |
+| `/ws` | WS | WebSocket — ESP32 envia `{"deviceId": "...", "db": ...}` |

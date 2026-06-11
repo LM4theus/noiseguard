@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NoiseGuard — Ambientes</title>
+  <title>NoiseGuard — Ambiente</title>
   <link rel="stylesheet" href="css/style.css">
-  <!-- Aplica o tema salvo antes da pintura (evita flash) -->
   <script>
     document.documentElement.setAttribute(
       'data-theme',
@@ -21,21 +20,29 @@
         <span class="conn-dot" id="conn-dot"></span>
         <span id="conn-text">CONECTANDO...</span>
       </div>
-      <a class="nav-link" href="devices.html">⚙️ Dispositivos</a>
       <button class="theme-btn" id="btn-theme" title="Alternar tema Dark / White">🌙</button>
     </div>
   </header>
 
   <main class="page">
+    <a class="back-link" href="index.html">← Ambientes</a>
+
     <div class="page-head">
-      <h1 class="page-title">Ambientes monitorados</h1>
-      <p class="page-subtitle">Clique em um ambiente para visualizar os dispositivos em tempo real.</p>
+      <h1 class="page-title" id="env-title">Ambiente</h1>
+      <p class="page-subtitle" id="env-type">Tipo: —</p>
     </div>
 
-    <div class="env-grid" id="env-grid"><!-- preenchido por environments.js --></div>
+    <h2 class="section-title">Planta baixa</h2>
+    <div class="floor-grid" id="floor-grid"><!-- preenchido por environment.js --></div>
+
+    <div class="legend">
+      <span class="legend-item"><span class="band-dot ok"></span>0–69 dB · Seguro</span>
+      <span class="legend-item"><span class="band-dot warn"></span>70–84 dB · Moderado</span>
+      <span class="legend-item"><span class="band-dot crit"></span>85+ dB · Crítico</span>
+    </div>
   </main>
 
   <script type="module" src="js/header.js"></script>
-  <script type="module" src="js/environments.js"></script>
+  <script type="module" src="js/environment.js"></script>
 </body>
 </html>

@@ -1,8 +1,11 @@
 // ATENÇÃO: este simulador foi substituído pela captura de microfone no frontend.
 // Para usar o microfone: npm start → abrir http://localhost:3000 → clicar em 🎤 Microfone
 // Este arquivo pode ser usado como fallback com: node server/simulator.js
+// Para simular um dispositivo específico: DEVICE_ID=s101 node server/simulator.js
 
 const http = require('http');
+
+const DEVICE_ID = process.env.DEVICE_ID || null;
 
 const BASE_DB = 55;
 const NOISE_RANGE = 10;
@@ -26,7 +29,7 @@ function nextDb() {
 }
 
 function postReading(db) {
-  const body = JSON.stringify({ db });
+  const body = JSON.stringify(DEVICE_ID ? { deviceId: DEVICE_ID, db } : { db });
   const options = {
     hostname: 'localhost',
     port: process.env.PORT || 3000,
@@ -49,6 +52,7 @@ function postReading(db) {
 }
 
 console.log(`NoiseGuard Simulator started — sending readings every ${INTERVAL_MS}ms`);
+console.log(DEVICE_ID ? `Device: ${DEVICE_ID}` : 'Device: (default — sem deviceId)');
 console.log('Press Ctrl+C to stop.\n');
 
 setInterval(() => {
