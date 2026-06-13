@@ -28,6 +28,14 @@ esp_err_t wifi_manager_start_sta(const app_config_t *cfg, int timeout_ms);
 esp_err_t wifi_manager_start_ap(void);
 
 /**
+ * Retorna o SSID do SoftAP no formato "<prefixo>_XXXXXX", onde XXXXXX sao
+ * os 6 ultimos digitos hex do MAC da WiFi (3 ultimos bytes). O prefixo vem
+ * de CONFIG_NG_AP_SSID. O valor e calculado uma vez e mantido em buffer
+ * estatico.
+ */
+const char *wifi_manager_ap_ssid(void);
+
+/**
  * true enquanto a STA estiver com IP valido.
  */
 bool wifi_manager_is_connected(void);

@@ -51,17 +51,25 @@ toda a faixa.
 Parâmetros padrão em `main/Kconfig.projbuild` (ajustáveis via `idf.py menuconfig`
 → *NoiseGuard - Configuracao de Hardware*):
 
-| Parâmetro | Default |
-|---|---|
-| GPIO do botão | 4 |
-| Canal ADC1 | 6 (GPIO34) |
-| SSID do AP de config | `NoiseGuard-Setup` |
-| Senha do AP de config | `noiseguard` |
-| Host do servidor | `192.168.0.100` |
-| Porta | `3000` |
+### GPIO
+| GPIO |  Direção  |    Função     | Descrição |
+|:----:|:---------:|:-------------:|:----------|
+| 4    | *Entrada* |    Botão      | Botão entre o pino e o GND, ativo em zero. Pull-up interno habilitado |
+| 34   | *Entrada* |   Sinal       | Entrada apenas; ideal para sensor. Atenuação 12 dB (~0–3,1 V) |
+| 0    | *Saída*   |  LED Status   | LED aceso quando o dispositivo está em modo de configuração |
+
+
+### Conexão
+
+| Parâmetro | Default | Descrição |
+|:---------:|:--------|:----------|
+| Prefixo do SSID do AP | `NoiseGuard` | O SSID final é `NoiseGuard_XXXXXX`, onde `XXXXXX` são os 6 últimos dígitos hex do MAC da WiFi (ex.: `NoiseGuard_A1B2C3`) |
+| Senha do AP de config | `noiseguard` |Senha da rede WiFi criada pelo ESP32 quando está em modo de configuração |
+| Host do servidor | `192.168.0.100` |Endereço IP do servidor |
+| Porta | `3000` |Porta do servidor |
 | Endpoint | `/api/noise` |
 | Device ID | `10034` |
-| Intervalo de envio | `500` ms |
+| Intervalo de envio | `1000` ms |
 
 Esses valores são apenas **defaults**; o que vale em runtime é o que estiver salvo
 na NVS pelo portal de configuração.
@@ -98,7 +106,8 @@ idf.py -p COM4 flash monitor
 
 1. Ligue a ESP segurando o **botão de configuração** (GPIO4 → GND). No primeiro
    boot, sem config salva, ela entra em modo de configuração automaticamente.
-2. No celular/PC, conecte-se à rede WiFi **`NoiseGuard-Setup`** (senha `noiseguard`).
+2. No celular/PC, conecte-se à rede WiFi **`NoiseGuard_XXXXXX`** (o nome exato aparece
+   no monitor serial e na lista de redes; senha `noiseguard`).
 3. Abra o navegador em **`http://192.168.4.1`**.
 4. Preencha SSID, senha, host/porta/endpoint do servidor, Device ID e intervalo.
 5. Clique em **Salvar e reiniciar**. A ESP grava na NVS e reinicia.

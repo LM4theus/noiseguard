@@ -54,7 +54,7 @@ static void run_config_mode(void)
     ESP_ERROR_CHECK(config_portal_start());
 
     ESP_LOGI(TAG, "Conecte-se ao WiFi '%s' e acesse http://192.168.4.1",
-             CONFIG_NG_AP_SSID);
+             wifi_manager_ap_ssid());
 
     // Fica vivo aguardando o usuario salvar (o portal reinicia a ESP).
     while (true) {

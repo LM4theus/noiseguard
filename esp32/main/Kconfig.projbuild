@@ -21,8 +21,12 @@ menu "NoiseGuard - Configuracao de Hardware"
             5=GPIO33 6=GPIO34 7=GPIO35
 
     config NG_AP_SSID
-        string "SSID do AP no modo de configuracao"
-        default "NoiseGuard-Setup"
+        string "Prefixo do SSID do AP no modo de configuracao"
+        default "NoiseGuard"
+        help
+            Prefixo do nome da rede criada no modo de configuracao.
+            O SSID final fica "<prefixo>_XXXXXX", onde XXXXXX sao os 6
+            ultimos digitos hex do MAC da WiFi (ex.: NoiseGuard_A1B2C3).
 
     config NG_AP_PASSWORD
         string "Senha do AP no modo de configuracao (>=8 chars, vazio = aberto)"

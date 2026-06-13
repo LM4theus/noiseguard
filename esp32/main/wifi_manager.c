@@ -6,6 +6,7 @@
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_netif.h"
+#include "esp_mac.h"
 #include "esp_log.h"
 #include "sdkconfig.h"
 
@@ -88,13 +89,28 @@ esp_err_t wifi_manager_start_sta(const app_config_t *cfg, int timeout_ms)
     return ESP_FAIL;
 }
 
+const char *wifi_manager_ap_ssid(void)
+{
+    static char ssid[33];
+    if (ssid[0] == '\0') {
+        uint8_t mac[6];
+        esp_read_mac(mac, ESP_MAC_WIFI_SOFTAP);
+        // 6 ultimos digitos hex = 3 ultimos bytes do MAC.
+        snprintf(ssid, sizeof(ssid), "%s_%02X%02X%02X",
+                 CONFIG_NG_AP_SSID, mac[3], mac[4], mac[5]);
+    }
+    return ssid;
+}
+
 esp_err_t wifi_manager_start_ap(void)
 {
     esp_netif_create_default_wifi_ap();
 
+    const char *ssid = wifi_manager_ap_ssid();
+
     wifi_config_t wc = { 0 };
-    strlcpy((char *)wc.ap.ssid, CONFIG_NG_AP_SSID, sizeof(wc.ap.ssid));
-    wc.ap.ssid_len = strlen(CONFIG_NG_AP_SSID);
+    strlcpy((char *)wc.ap.ssid, ssid, sizeof(wc.ap.ssid));
+    wc.ap.ssid_len = strlen(ssid);
     wc.ap.max_connection = 4;
     wc.ap.channel = 1;
 
@@ -114,7 +130,7 @@ esp_err_t wifi_manager_start_ap(void)
     esp_netif_t *ap = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
     esp_netif_get_ip_info(ap, &ip);
     ESP_LOGI(TAG, "SoftAP '%s' ativo. Conecte e acesse http://" IPSTR,
-             CONFIG_NG_AP_SSID, IP2STR(&ip.ip));
+             ssid, IP2STR(&ip.ip));
     return ESP_OK;
 }
 
