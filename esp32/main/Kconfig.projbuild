@@ -76,4 +76,14 @@ menu "NoiseGuard - Configuracao de Hardware"
             De quanto em quanto tempo o relogio e re-sincronizado via NTP.
             Minimo efetivo de 15s (imposto pelo lwip).
 
+    config NG_OFFLINE_BUFFER_KB
+        int "Tamanho do buffer offline em RAM (KB)"
+        default 32
+        range 1 128
+        help
+            Tamanho do buffer circular usado para store-and-forward quando o
+            dispositivo fica offline. Cada evento ocupa 6 bytes (~170 eventos
+            por KB; 64 KB ~ 10922 eventos). Buffers maiores reduzem o heap
+            livre disponivel para o WiFi/HTTP.
+
 endmenu

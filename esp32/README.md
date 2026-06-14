@@ -156,7 +156,8 @@ Quando o dispositivo fica sem conseguir entregar uma leitura (WiFi caiu ou o
 servidor não respondeu), ela é guardada num **buffer circular em RAM**:
 
 - **Capacidade:** 64 KB → **~10.922 eventos** (registro otimizado de **6 bytes**:
-  timestamp em segundos `uint32` + dB em décimos `int16`).
+  timestamp em segundos `uint32` + dB em décimos `int16`). O tamanho é
+  configurável em `idf.py menuconfig` (`NG_OFFLINE_BUFFER_KB`, ~170 eventos/KB).
 - **Resolução do registro:** hora com 1 s e ruído com 0,1 dB.
 - **Cheio:** sobrescreve a leitura **mais antiga** (mantém sempre as mais recentes).
 - **Flush automático:** ao reconectar, as pendentes são reenviadas da **mais

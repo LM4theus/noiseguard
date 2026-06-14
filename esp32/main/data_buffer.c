@@ -4,6 +4,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "esp_log.h"
+#include "sdkconfig.h"
 
 static const char *TAG = "data_buffer";
 
@@ -14,8 +15,8 @@ typedef struct __attribute__((packed)) {
     int16_t  db_dx;    // dB em décimos (ex.: 72.4 dB -> 724)
 } record_t;
 
-#define BUFFER_BYTES   (64 * 1024)
-#define CAPACITY       (BUFFER_BYTES / sizeof(record_t))   // 10922 eventos
+#define BUFFER_BYTES   (CONFIG_NG_OFFLINE_BUFFER_KB * 1024)
+#define CAPACITY       (BUFFER_BYTES / sizeof(record_t))   // ~170 eventos/KB
 
 static record_t s_buf[CAPACITY];
 static size_t   s_start;   // índice da leitura mais antiga
