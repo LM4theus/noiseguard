@@ -34,6 +34,7 @@ static const char *PAGE_TEMPLATE =
     "<div><label>Device ID</label><input name=\"devid\" type=\"number\" value=\"%lu\" required></div></div>"
     "<label>Endpoint</label><input name=\"path\" value=\"%s\" maxlength=\"63\" required>"
     "<label>Intervalo de envio (ms)</label><input name=\"interval\" type=\"number\" value=\"%lu\" min=\"100\" required>"
+    "<label>Resync NTP (s)</label><input name=\"ntpint\" type=\"number\" value=\"%lu\" min=\"15\" required>"
     "<button type=\"submit\">Salvar e reiniciar</button>"
     "</form></div></body></html>";
 
@@ -100,7 +101,8 @@ static esp_err_t root_get(httpd_req_t *req)
     snprintf(page, 3072, PAGE_TEMPLATE,
              cfg.wifi_ssid, cfg.wifi_pass, cfg.server_host,
              cfg.server_port, (unsigned long)cfg.device_id,
-             cfg.server_path, (unsigned long)cfg.interval_ms);
+             cfg.server_path, (unsigned long)cfg.interval_ms,
+             (unsigned long)cfg.ntp_interval_s);
 
     httpd_resp_set_type(req, "text/html");
     esp_err_t err = httpd_resp_send(req, page, HTTPD_RESP_USE_STRLEN);
@@ -154,6 +156,10 @@ static esp_err_t save_post(httpd_req_t *req)
     if (form_get(body, "interval", tmp, sizeof(tmp))) {
         cfg.interval_ms = (uint32_t)strtoul(tmp, NULL, 10);
         if (cfg.interval_ms < 100) cfg.interval_ms = 100;
+    }
+    if (form_get(body, "ntpint", tmp, sizeof(tmp))) {
+        cfg.ntp_interval_s = (uint32_t)strtoul(tmp, NULL, 10);
+        if (cfg.ntp_interval_s < 15) cfg.ntp_interval_s = 15;
     }
 
     free(body);

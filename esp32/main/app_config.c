@@ -25,9 +25,10 @@ void app_config_load(app_config_t *cfg)
     strlcpy(cfg->server_host, CONFIG_NG_DEFAULT_SERVER_HOST, sizeof(cfg->server_host));
     strlcpy(cfg->server_path, CONFIG_NG_DEFAULT_SERVER_PATH, sizeof(cfg->server_path));
     cfg->server_port = CONFIG_NG_DEFAULT_SERVER_PORT;
-    cfg->device_id   = CONFIG_NG_DEFAULT_DEVICE_ID;
-    cfg->interval_ms = CONFIG_NG_DEFAULT_INTERVAL_MS;
-    cfg->provisioned = false;
+    cfg->device_id      = CONFIG_NG_DEFAULT_DEVICE_ID;
+    cfg->interval_ms    = CONFIG_NG_DEFAULT_INTERVAL_MS;
+    cfg->ntp_interval_s = CONFIG_NG_DEFAULT_NTP_INTERVAL_S;
+    cfg->provisioned    = false;
 
     nvs_handle_t h;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &h);
@@ -47,15 +48,17 @@ void app_config_load(app_config_t *cfg)
     uint32_t u32;
     if (nvs_get_u32(h, "devid", &u32) == ESP_OK) cfg->device_id = u32;
     if (nvs_get_u32(h, "interval", &u32) == ESP_OK) cfg->interval_ms = u32;
+    if (nvs_get_u32(h, "ntpint", &u32) == ESP_OK) cfg->ntp_interval_s = u32;
 
     uint8_t prov = 0;
     if (nvs_get_u8(h, "prov", &prov) == ESP_OK) cfg->provisioned = (prov != 0);
 
     nvs_close(h);
 
-    ESP_LOGI(TAG, "Config carregada: ssid='%s' host=%s:%u path=%s devid=%lu intervalo=%lums prov=%d",
+    ESP_LOGI(TAG, "Config carregada: ssid='%s' host=%s:%u path=%s devid=%lu intervalo=%lums ntp=%lus prov=%d",
              cfg->wifi_ssid, cfg->server_host, cfg->server_port, cfg->server_path,
-             (unsigned long)cfg->device_id, (unsigned long)cfg->interval_ms, cfg->provisioned);
+             (unsigned long)cfg->device_id, (unsigned long)cfg->interval_ms,
+             (unsigned long)cfg->ntp_interval_s, cfg->provisioned);
 }
 
 esp_err_t app_config_save(const app_config_t *cfg)
@@ -74,6 +77,7 @@ esp_err_t app_config_save(const app_config_t *cfg)
     err |= nvs_set_u16(h, "port", cfg->server_port);
     err |= nvs_set_u32(h, "devid", cfg->device_id);
     err |= nvs_set_u32(h, "interval", cfg->interval_ms);
+    err |= nvs_set_u32(h, "ntpint", cfg->ntp_interval_s);
     err |= nvs_set_u8(h, "prov", 1);
 
     if (err == ESP_OK) {

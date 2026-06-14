@@ -10,6 +10,23 @@ menu "NoiseGuard - Configuracao de Hardware"
             interno e habilitado automaticamente.
             EVITE GPIO0: nivel baixo no boot coloca a ROM em modo download.
 
+    config NG_STATUS_LED_GPIO
+        int "GPIO do LED de status (primario)"
+        default 0
+        range 0 39
+        help
+            GPIO que aciona o LED de status. O LED acende em nivel alto
+            (anodo no GPIO, catodo no GND atraves de um resistor).
+            Padroes de piscada indicam o modo (config x normal).
+
+    config NG_STATUS_LED_GPIO2
+        int "GPIO do LED de status (secundario)"
+        default 2
+        range 0 39
+        help
+            Segundo GPIO acionado em paralelo com o primario, com exatamente
+            o mesmo padrao de piscada. Use -1 para desabilitar o secundario.
+
     config NG_ADC_CHANNEL
         int "Canal ADC1 do sensor analogico"
         default 6
@@ -51,5 +68,12 @@ menu "NoiseGuard - Configuracao de Hardware"
     config NG_DEFAULT_INTERVAL_MS
         int "Intervalo de envio padrao (ms)"
         default 500
+
+    config NG_DEFAULT_NTP_INTERVAL_S
+        int "Intervalo de resync NTP padrao (s)"
+        default 3600
+        help
+            De quanto em quanto tempo o relogio e re-sincronizado via NTP.
+            Minimo efetivo de 15s (imposto pelo lwip).
 
 endmenu

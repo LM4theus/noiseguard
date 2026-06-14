@@ -4,6 +4,7 @@
 #include <string.h>
 #include "esp_log.h"
 #include "esp_http_client.h"
+#include "time_sync.h"
 
 static const char *TAG = "sender";
 
@@ -21,11 +22,21 @@ esp_err_t sender_post_reading(const app_config_t *cfg, float db)
     }
 
     // O servidor NoiseGuard valida "db" como numero (0..140), por isso
-    // enviamos o valor numerico (e nao string).
-    char body[96];
-    int body_len = snprintf(body, sizeof(body),
+    // enviamos o valor numerico (e nao string). O "timestamp" (epoch ms,
+    // igual a Date.now()) so e incluido se o relogio ja sincronizou via NTP;
+    // caso contrario o servidor preenche a hora ao receber.
+    char body[128];
+    int body_len;
+    if (time_sync_is_valid()) {
+        body_len = snprintf(body, sizeof(body),
+                            "{\"deviceid\":%lu,\"db\":%.1f,\"timestamp\":%lld}",
+                            (unsigned long)cfg->device_id, db,
+                            (long long)time_sync_now_ms());
+    } else {
+        body_len = snprintf(body, sizeof(body),
                             "{\"deviceid\":%lu,\"db\":%.1f}",
                             (unsigned long)cfg->device_id, db);
+    }
 
     esp_http_client_config_t http_cfg = {
         .url = url,

@@ -3,6 +3,7 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_system.h"
+#include "esp_attr.h"
 #include "nvs_flash.h"
 #include "driver/gpio.h"
 #include "sdkconfig.h"
@@ -12,11 +13,19 @@
 #include "config_portal.h"
 #include "sensor.h"
 #include "sender.h"
+#include "status_led.h"
+#include "time_sync.h"
 
 static const char *TAG = "main";
 
 #define CONFIG_BUTTON_GPIO  CONFIG_NG_CONFIG_BUTTON_GPIO
 #define WIFI_TIMEOUT_MS     20000
+
+// Flag em memoria RTC: sobrevive a um esp_restart() (mas nao a um power-off).
+// Usado para entrar no modo de configuracao apos falha no NTP obrigatorio,
+// evitando reboot-loop no modo normal.
+#define FORCE_CONFIG_MAGIC  0xC0FFEE01u
+RTC_DATA_ATTR static uint32_t s_force_config;
 
 /**
  * Le o botao de configuracao (ativo em zero). Retorna true se pressionado.
@@ -49,6 +58,7 @@ static bool config_button_pressed(void)
 static void run_config_mode(void)
 {
     ESP_LOGI(TAG, "==> MODO DE CONFIGURACAO");
+    status_led_start(STATUS_LED_CONFIG);
     ESP_ERROR_CHECK(wifi_manager_init());
     ESP_ERROR_CHECK(wifi_manager_start_ap());
     ESP_ERROR_CHECK(config_portal_start());
@@ -69,11 +79,23 @@ static void run_config_mode(void)
 static void run_normal_mode(const app_config_t *cfg)
 {
     ESP_LOGI(TAG, "==> MODO NORMAL");
+    status_led_start(STATUS_LED_NORMAL);
 
     ESP_ERROR_CHECK(wifi_manager_init());
     if (wifi_manager_start_sta(cfg, WIFI_TIMEOUT_MS) != ESP_OK) {
         ESP_LOGE(TAG, "Sem WiFi. Reiniciando em 10s...");
         vTaskDelay(pdMS_TO_TICKS(10000));
+        esp_restart();
+    }
+
+    // Sincronismo NTP OBRIGATORIO logo apos o boot. Sem hora valida, nao
+    // faz sentido carimbar leituras. Se falhar (ex.: WiFi sem internet),
+    // entra no modo de configuracao no proximo boot em vez de ficar em
+    // reboot-loop no modo normal.
+    if (!time_sync_init(cfg->ntp_interval_s, 60000)) {
+        ESP_LOGE(TAG, "Sincronismo NTP obrigatorio falhou; indo para modo de configuracao");
+        s_force_config = FORCE_CONFIG_MAGIC;
+        vTaskDelay(pdMS_TO_TICKS(3000));
         esp_restart();
     }
 
@@ -110,10 +132,17 @@ void app_main(void)
     ESP_LOGI(TAG, "Botao de config (GPIO%d) pressionado no boot: %s",
              CONFIG_BUTTON_GPIO, button ? "SIM" : "nao");
 
-    // Entra em config se o botao estiver pressionado no boot OU se ainda
-    // nao houver configuracao salva.
-    if (button || !cfg.provisioned) {
-        if (!cfg.provisioned) {
+    // Le e limpa o flag de "forcar config" (one-shot) deixado por uma falha
+    // de NTP no boot anterior.
+    bool force_cfg = (s_force_config == FORCE_CONFIG_MAGIC);
+    s_force_config = 0;
+
+    // Entra em config se: botao pressionado, sem config salva, ou o boot
+    // anterior falhou no sincronismo NTP obrigatorio.
+    if (button || !cfg.provisioned || force_cfg) {
+        if (force_cfg) {
+            ESP_LOGW(TAG, "Falha de NTP no boot anterior - entrando em config para corrigir a rede");
+        } else if (!cfg.provisioned) {
             ESP_LOGW(TAG, "Dispositivo nao provisionado - entrando em config");
         }
         run_config_mode();   // nao retorna

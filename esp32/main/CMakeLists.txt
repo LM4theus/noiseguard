@@ -6,6 +6,8 @@ idf_component_register(
         "config_portal.c"
         "sensor.c"
         "sender.c"
+        "status_led.c"
+        "time_sync.c"
     INCLUDE_DIRS
         "include"
     REQUIRES
@@ -17,4 +19,5 @@ idf_component_register(
         esp_http_client
         esp_adc
         driver
+        lwip
 )

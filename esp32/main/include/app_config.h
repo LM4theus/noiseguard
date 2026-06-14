@@ -24,7 +24,8 @@ typedef struct {
     char     server_path[NG_PATH_MAX_LEN];
     uint32_t device_id;
     uint32_t interval_ms;
-    bool     provisioned;   // true quando o usuario ja salvou uma config valida
+    uint32_t ntp_interval_s;   // intervalo de resync NTP, em segundos
+    bool     provisioned;      // true quando o usuario ja salvou uma config valida
 } app_config_t;
 
 /**

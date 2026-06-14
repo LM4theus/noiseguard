@@ -6,13 +6,17 @@ sinal analógico (microfone/sensor de ruído), converte para um valor aproximado
 
 ```json
 POST http://<host>:<porta>/api/noise
-{"deviceid":10034,"db":97.3}
+{"deviceid":10034,"db":97.3,"timestamp":1700000000000}
 ```
 
 > **Nota sobre o formato:** o servidor (`back/server/routes/noise.js`) valida `db`
 > como **número** entre 0 e 140. Por isso o firmware envia o valor numérico (não
 > como string). O campo `deviceid` é incluído conforme solicitado; o servidor
 > atual o ignora, mas ele já vai no payload para uso futuro.
+>
+> **`timestamp`** (epoch em ms, igual ao `Date.now()`) só é enviado depois que o
+> relógio sincroniza via **NTP**. Enquanto isso não acontece, o campo é omitido e
+> o servidor carimba a hora ao receber.
 
 ---
 
@@ -56,7 +60,7 @@ Parâmetros padrão em `main/Kconfig.projbuild` (ajustáveis via `idf.py menucon
 |:----:|:---------:|:-------------:|:----------|
 | 4    | *Entrada* |    Botão      | Botão entre o pino e o GND, ativo em zero. Pull-up interno habilitado |
 | 34   | *Entrada* |   Sinal       | Entrada apenas; ideal para sensor. Atenuação 12 dB (~0–3,1 V) |
-| 0    | *Saída*   |  LED Status   | LED aceso quando o dispositivo está em modo de configuração |
+| 0 e 2 | *Saída*   |  LED Status   | Indica o modo por padrão de piscada (veja abaixo). Anodo no GPIO, catodo no GND via resistor |
 
 
 ### Conexão
@@ -70,9 +74,26 @@ Parâmetros padrão em `main/Kconfig.projbuild` (ajustáveis via `idf.py menucon
 | Endpoint | `/api/noise` |
 | Device ID | `10034` |
 | Intervalo de envio | `1000` ms |
+| Resync NTP | `3600` s | De quanto em quanto tempo o relógio é re-sincronizado via NTP (mín. 15 s) |
 
 Esses valores são apenas **defaults**; o que vale em runtime é o que estiver salvo
 na NVS pelo portal de configuração.
+
+> **Sincronismo obrigatório no boot:** ao entrar em modo normal, a ESP aguarda
+> (até 60 s) a primeira sincronização NTP antes de começar a enviar — nenhuma
+> leitura é enviada sem hora válida. Se não sincronizar nesse prazo (ex.: WiFi
+> sem saída para a internet), a ESP **entra no modo de configuração** (em vez de
+> ficar em reboot-loop), permitindo corrigir a rede pelo portal.
+
+### LED de status (GPIO0 e GPIO2)
+
+Os dois GPIOs são acionados em paralelo, com o mesmo padrão. O LED indica o modo
+atual pelo padrão de piscada:
+
+| Modo | Padrão (ms) | Aparência |
+|---|---|---|
+| Configuração | 200 ON / 200 OFF / 200 ON / 200 OFF / 200 ON / 1000 OFF | 3 piscadas rápidas + pausa longa |
+| Normal | 500 ON / 1500 OFF | piscada lenta |
 
 ---
 
@@ -120,7 +141,8 @@ começa a enviar leituras ao servidor. Acompanhe pelo monitor serial:
 ```
 I (1234) main: ==> MODO NORMAL
 I (2345) wifi: IP obtido: 192.168.0.42
-I (3456) sender: POST http://192.168.0.100:3000/api/noise -> 200  body={"deviceid":10034,"db":72.4}
+I (2900) time_sync: Relogio sincronizado (UTC): 2026-06-14 12:00:00
+I (3456) sender: POST http://192.168.0.100:3000/api/noise -> 200  body={"deviceid":10034,"db":72.4,"timestamp":1700000000000}
 ```
 
 ---
@@ -140,7 +162,9 @@ esp32/
     ├── wifi_manager.c/.h     # WiFi STA (normal) e SoftAP (config)
     ├── config_portal.c/.h    # servidor HTTP + formulário de config
     ├── sensor.c/.h           # leitura ADC e cálculo de dB (RMS)
-    └── sender.c/.h           # POST JSON para o servidor
+    ├── sender.c/.h           # POST JSON para o servidor
+    ├── status_led.c/.h       # LED de status (padrões de piscada)
+    └── time_sync.c/.h        # sincronização de hora via NTP/SNTP
 ```
 
 ---
