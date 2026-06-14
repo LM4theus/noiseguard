@@ -30,6 +30,9 @@ POST http://<host>:<porta>/api/noise
 - **Entrada no modo de configuração:**
   - Segurando o **botão de configuração** (ativo em zero) durante o boot; **ou**
   - Automaticamente, quando ainda não há configuração salva (primeiro boot).
+- **Buffer offline (store-and-forward):** se o WiFi cair ou o servidor ficar
+  indisponível, as leituras são guardadas num **buffer circular em RAM** e
+  reenviadas (com a hora original) assim que a conexão volta.
 
 ---
 
@@ -147,6 +150,26 @@ I (3456) sender: POST http://192.168.0.100:3000/api/noise -> 200  body={"devicei
 
 ---
 
+## Buffer offline (store-and-forward)
+
+Quando o dispositivo fica sem conseguir entregar uma leitura (WiFi caiu ou o
+servidor não respondeu), ela é guardada num **buffer circular em RAM**:
+
+- **Capacidade:** 64 KB → **~10.922 eventos** (registro otimizado de **6 bytes**:
+  timestamp em segundos `uint32` + dB em décimos `int16`).
+- **Resolução do registro:** hora com 1 s e ruído com 0,1 dB.
+- **Cheio:** sobrescreve a leitura **mais antiga** (mantém sempre as mais recentes).
+- **Flush automático:** ao reconectar, as pendentes são reenviadas da **mais
+  antiga para a mais nova**, preservando a ordem cronológica e a **hora original**
+  de cada leitura (até 10 por ciclo, para não travar a amostragem).
+
+> ⚠️ O buffer é em **RAM** — não sobrevive a uma queda de energia. Para isso,
+> seria preciso memória não-volátil (FRAM/SD).
+
+A ~1 leitura/s, 10.922 eventos cobrem **~3 horas** de queda de rede.
+
+---
+
 ## Estrutura do projeto
 
 ```
@@ -164,7 +187,8 @@ esp32/
     ├── sensor.c/.h           # leitura ADC e cálculo de dB (RMS)
     ├── sender.c/.h           # POST JSON para o servidor
     ├── status_led.c/.h       # LED de status (padrões de piscada)
-    └── time_sync.c/.h        # sincronização de hora via NTP/SNTP
+    ├── time_sync.c/.h        # sincronização de hora via NTP/SNTP
+    └── data_buffer.c/.h      # buffer circular em RAM (store-and-forward)
 ```
 
 ---

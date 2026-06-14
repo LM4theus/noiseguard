@@ -15,6 +15,7 @@
 #include "sender.h"
 #include "status_led.h"
 #include "time_sync.h"
+#include "data_buffer.h"
 
 static const char *TAG = "main";
 
@@ -72,9 +73,42 @@ static void run_config_mode(void)
     }
 }
 
+// Maximo de leituras pendentes drenadas por ciclo, para nao monopolizar a
+// task durante uma recuperacao longa (cada POST leva dezenas de ms).
+#define FLUSH_MAX_PER_CYCLE  10
+
+/**
+ * Tenta drenar (enviar) as leituras pendentes do buffer, da mais antiga para
+ * a mais nova, removendo cada uma so apos o POST ter sucesso. Para no primeiro
+ * erro (servidor indisponivel) e tenta de novo no proximo ciclo.
+ *
+ * @return true se o buffer ficou vazio (tudo enviado).
+ */
+static bool flush_buffer(const app_config_t *cfg)
+{
+    int sent = 0;
+    float db;
+    int64_t ts_ms;
+
+    while (sent < FLUSH_MAX_PER_CYCLE && data_buffer_peek_oldest(&db, &ts_ms)) {
+        if (sender_post_reading(cfg, db, ts_ms) != ESP_OK) {
+            break;  // servidor caiu de novo; mantem no buffer
+        }
+        data_buffer_pop_oldest();
+        sent++;
+    }
+
+    if (sent > 0) {
+        ESP_LOGI(TAG, "Flush: %d pendente(s) enviada(s); restam %u",
+                 sent, (unsigned)data_buffer_count());
+    }
+    return data_buffer_count() == 0;
+}
+
 /**
  * Modo normal: conecta no WiFi, le o sensor e envia ao servidor
- * no intervalo configurado.
+ * no intervalo configurado. Quando offline (ou servidor indisponivel),
+ * armazena as leituras no buffer circular e as reenvia ao reconectar.
  */
 static void run_normal_mode(const app_config_t *cfg)
 {
@@ -100,16 +134,29 @@ static void run_normal_mode(const app_config_t *cfg)
     }
 
     ESP_ERROR_CHECK(sensor_init());
+    data_buffer_init();
 
     TickType_t last = xTaskGetTickCount();
     const TickType_t period = pdMS_TO_TICKS(cfg->interval_ms);
 
     while (true) {
-        if (wifi_manager_is_connected()) {
-            float db = sensor_read_db();
-            sender_post_reading(cfg, db);
+        float db = sensor_read_db();
+        int64_t ts_ms = time_sync_now_ms();
+
+        if (!wifi_manager_is_connected()) {
+            // Offline: guarda para enviar depois.
+            data_buffer_push(db, ts_ms);
         } else {
-            ESP_LOGW(TAG, "WiFi caiu; aguardando reconexao...");
+            // Online: drena pendentes primeiro (mantem ordem cronologica).
+            bool drained = flush_buffer(cfg);
+            if (!drained) {
+                // Ainda ha pendentes (servidor indisponivel): enfileira a
+                // atual em vez de fura-la na frente das mais antigas.
+                data_buffer_push(db, ts_ms);
+            } else if (sender_post_reading(cfg, db, ts_ms) != ESP_OK) {
+                // Buffer vazio mas o POST da atual falhou: guarda no buffer.
+                data_buffer_push(db, ts_ms);
+            }
         }
         vTaskDelayUntil(&last, period);
     }

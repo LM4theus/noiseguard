@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdint.h>
 #include "esp_err.h"
 #include "app_config.h"
 
@@ -9,11 +10,13 @@ extern "C" {
 
 /**
  * Monta e envia um POST JSON para http://host:port/path com o corpo:
- *   {"deviceid":<device_id>,"db":<db>}
+ *   {"deviceid":<device_id>,"db":<db>,"timestamp":<ts_ms>}
  *
+ * @param ts_ms epoch em milissegundos da leitura (hora original). Use <= 0
+ *              para omitir o campo (o servidor carimba a hora ao receber).
  * @return ESP_OK em sucesso (status HTTP 2xx); erro caso contrario.
  */
-esp_err_t sender_post_reading(const app_config_t *cfg, float db);
+esp_err_t sender_post_reading(const app_config_t *cfg, float db, int64_t ts_ms);
 
 #ifdef __cplusplus
 }

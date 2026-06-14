@@ -8,6 +8,7 @@ idf_component_register(
         "sender.c"
         "status_led.c"
         "time_sync.c"
+        "data_buffer.c"
     INCLUDE_DIRS
         "include"
     REQUIRES
