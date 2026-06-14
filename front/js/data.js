@@ -5,14 +5,16 @@
 
 const BASE = 'http://localhost:3000';
 
-let environments = [];   // [{ id, name, type, icon, devices: [...] }]
-let deviceList   = [];   // lista plana de dispositivos
+let organizations = []; // [{ id, name, active }]
+let environments  = [];  // [{ id, name, type, icon, orgId, devices: [...] }]
+let deviceList    = [];   // lista plana de dispositivos
 
 // Carrega (ou recarrega) o registro do backend e monta a árvore.
 export async function loadRegistry() {
   const res = await fetch(`${BASE}/api/registry`);
   const reg = await res.json();
 
+  organizations = reg.organizations ?? [];
   deviceList = reg.devices;
   environments = reg.environments.map(env => ({
     ...env,
@@ -22,12 +24,43 @@ export async function loadRegistry() {
   return environments;
 }
 
+export function getOrganizations() {
+  return organizations;
+}
+
+export function getOrganization(id) {
+  return organizations.find(o => o.id === id) ?? null;
+}
+
 export function getEnvironments() {
   return environments;
 }
 
+export function getEnvironmentsByOrg(orgId) {
+  return environments.filter(e => e.orgId === orgId);
+}
+
 export function getEnvironment(id) {
   return environments.find(e => e.id === id) ?? null;
+}
+
+// Todos os dispositivos (ativos) de uma organização.
+function orgDevices(org) {
+  return getEnvironmentsByOrg(org.id).flatMap(e => e.devices);
+}
+
+export function orgDeviceCount(org) {
+  return orgDevices(org).length;
+}
+
+export function orgEnvCount(org) {
+  return getEnvironmentsByOrg(org.id).length;
+}
+
+export function orgAvg(org) {
+  const devices = orgDevices(org);
+  if (devices.length === 0) return 0;
+  return devices.reduce((acc, d) => acc + deviceDb(d), 0) / devices.length;
 }
 
 export function findDevice(deviceId) {

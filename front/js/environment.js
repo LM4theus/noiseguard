@@ -1,14 +1,16 @@
 // Tela 2 — Detalhe do ambiente (planta baixa).
 import {
-  loadRegistry, getEnvironment, typeLabel, deviceDb, band, simulateStep,
+  loadRegistry, getEnvironment, getOrganization, typeLabel,
+  deviceDb, band, simulateStep,
 } from './data.js';
 
 const params = new URLSearchParams(location.search);
 const envId  = params.get('id');
 
-const titleEl = document.getElementById('env-title');
-const typeEl  = document.getElementById('env-type');
-const grid    = document.getElementById('floor-grid');
+const titleEl  = document.getElementById('env-title');
+const typeEl   = document.getElementById('env-type');
+const grid     = document.getElementById('floor-grid');
+const backLink = document.getElementById('back-link');
 
 let env = null;
 
@@ -33,6 +35,14 @@ let env = null;
   document.title = `NoiseGuard — ${env.name}`;
   titleEl.textContent = `${env.icon} ${env.name}`;
   typeEl.textContent  = `Tipo: ${typeLabel(env.type)}`;
+
+  // Volta para a lista de ambientes da organização deste ambiente.
+  const org = getOrganization(env.orgId);
+  if (org) {
+    backLink.textContent = `← ${org.name}`;
+    backLink.href = `organization.html?id=${org.id}`;
+  }
+
   render();
   setInterval(() => { simulateStep(); render(); }, 2000);
 })();

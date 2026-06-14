@@ -981,3 +981,26 @@ body {
   }
   .form-panel { position: static; }
 }
+
+/* Botão pequeno (ações em linha de tabela) */
+.btn-sm {
+  font-size: 0.76rem;
+  padding: 5px 10px;
+  text-decoration: none;
+  display: inline-block;
+}
+
+/* Linha de organização selecionada (mostrando seus ambientes) */
+.data-table tr.row-selected td {
+  background: rgba(245, 166, 35, 0.08);
+}
+
+/* Cabeçalho da seção de ambientes dentro da gestão de organizações */
+.env-section-head {
+  margin-top: 28px;
+  align-items: center;
+}
+
+.env-section-head .section-title {
+  margin-bottom: 0;
+}

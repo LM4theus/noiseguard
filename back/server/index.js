@@ -6,6 +6,8 @@ const store = require('./store');
 const { ingest } = require('./ingest');
 const noiseRouter = require('./routes/noise');
 const devicesRouter = require('./routes/devices');
+const organizationsRouter = require('./routes/organizations');
+const environmentsRouter = require('./routes/environments');
 
 const PORT = process.env.PORT || 3000;
 const app = express();
@@ -23,6 +25,8 @@ app.get('/', (req, res) => {
 });
 app.use('/api', noiseRouter);
 app.use('/api', devicesRouter);
+app.use('/api', organizationsRouter);
+app.use('/api', environmentsRouter);
 
 // SSE clients list
 const sseClients = [];

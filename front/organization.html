@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NoiseGuard — Organizações</title>
+  <title>NoiseGuard — Organização</title>
   <link rel="stylesheet" href="css/style.css">
-  <!-- Aplica o tema salvo antes da pintura (evita flash) -->
   <script>
     document.documentElement.setAttribute(
       'data-theme',
@@ -29,15 +28,17 @@
   </header>
 
   <main class="page">
+    <a class="back-link" href="index.html">← Organizações</a>
+
     <div class="page-head">
-      <h1 class="page-title">Organizações</h1>
-      <p class="page-subtitle">Selecione uma organização para ver seus ambientes monitorados.</p>
+      <h1 class="page-title" id="env-page-title">Ambientes monitorados</h1>
+      <p class="page-subtitle">Clique em um ambiente para visualizar os dispositivos em tempo real.</p>
     </div>
 
-    <div class="env-grid" id="org-grid"><!-- preenchido por home.js --></div>
+    <div class="env-grid" id="env-grid"><!-- preenchido por organization.js --></div>
   </main>
 
   <script type="module" src="js/header.js"></script>
-  <script type="module" src="js/home.js"></script>
+  <script type="module" src="js/organization.js"></script>
 </body>
 </html>

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NoiseGuard — Gestão de organizações</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    document.documentElement.setAttribute(
+      'data-theme',
+      localStorage.getItem('theme') || 'dark'
+    );
+  </script>
+</head>
+<body>
+  <header class="header">
+    <a class="header-logo" href="index.html">🔊 NoiseGuard</a>
+    <div class="header-right">
+      <div class="conn-pill">
+        <span class="conn-dot" id="conn-dot"></span>
+        <span id="conn-text">CONECTANDO...</span>
+      </div>
+      <a class="nav-link" href="environments.html">📍 Ambientes</a>
+      <a class="nav-link" href="devices.html">⚙️ Dispositivos</a>
+      <button class="theme-btn" id="btn-theme" title="Alternar tema Dark / White">🌙</button>
+    </div>
+  </header>
+
+  <main class="page">
+    <a class="back-link" href="index.html">← Início</a>
+
+    <div class="page-head page-head-row">
+      <div>
+        <h1 class="page-title">Gestão de organizações</h1>
+        <p class="page-subtitle">Cadastre organizações e gerencie os ambientes de cada uma.</p>
+      </div>
+      <button class="btn-primary" id="btn-new-org">+ Nova organização</button>
+    </div>
+
+    <!-- ── Organizações ── -->
+    <div class="mgmt-layout">
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Organização</th>
+              <th>Ambientes</th>
+              <th>Dispositivos</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="orgs-tbody">
+            <tr><td colspan="5" class="table-empty">Carregando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <aside class="form-panel" id="org-form-panel" hidden>
+        <div class="form-panel-head">
+          <h2 id="org-form-title">Nova organização</h2>
+          <button class="icon-btn" id="org-form-close" title="Fechar">✕</button>
+        </div>
+        <form id="org-form" novalidate>
+          <label class="field">
+            <span>Nome</span>
+            <input name="name" id="fo-name" placeholder="ex.: EloClin" autocomplete="off">
+          </label>
+          <label class="field field-check">
+            <input name="active" id="fo-active" type="checkbox" checked>
+            <span>Organização ativa</span>
+          </label>
+          <p class="form-errors" id="org-form-errors" hidden></p>
+          <div class="form-actions">
+            <button type="button" class="btn-ghost" id="org-form-cancel">Cancelar</button>
+            <button type="submit" class="btn-primary">Salvar</button>
+          </div>
+        </form>
+      </aside>
+    </div>
+
+    <!-- ── Ambientes da organização selecionada ── -->
+    <section id="env-section" hidden>
+      <div class="page-head page-head-row env-section-head">
+        <h2 class="section-title" id="env-section-title">Ambientes</h2>
+        <button class="btn-primary" id="btn-new-env">+ Novo ambiente</button>
+      </div>
+
+      <div class="mgmt-layout">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Ambiente</th>
+                <th>Tipo</th>
+                <th>Dispositivos</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="envs-tbody">
+              <tr><td colspan="4" class="table-empty">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <aside class="form-panel" id="env-form-panel" hidden>
+          <div class="form-panel-head">
+            <h2 id="env-form-title">Novo ambiente</h2>
+            <button class="icon-btn" id="env-form-close" title="Fechar">✕</button>
+          </div>
+          <form id="env-form" novalidate>
+            <label class="field">
+              <span>Nome</span>
+              <input name="name" id="fe-name" placeholder="ex.: Escola Central" autocomplete="off">
+            </label>
+            <label class="field">
+              <span>Tipo</span>
+              <select name="type" id="fe-type">
+                <option value="school">🏫 Escola</option>
+                <option value="industrial">🏭 Industrial</option>
+                <option value="office">🏢 Escritório</option>
+                <option value="hospital">🏥 Hospital</option>
+              </select>
+            </label>
+            <p class="form-errors" id="env-form-errors" hidden></p>
+            <div class="form-actions">
+              <button type="button" class="btn-ghost" id="env-form-cancel">Cancelar</button>
+              <button type="submit" class="btn-primary">Salvar</button>
+            </div>
+          </form>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="js/header.js"></script>
+  <script type="module" src="js/organizations.js"></script>
+</body>
+</html>

@@ -75,10 +75,12 @@ back/
   server/
     index.js    ← servidor Express + WebSocket + SSE
     routes/
-      noise.js  ← rotas de leitura (/api/noise, /api/history)
-      devices.js← CRUD do registro (/api/registry, /api/devices)
+      noise.js        ← rotas de leitura (/api/noise, /api/history)
+      devices.js      ← CRUD de dispositivos (/api/registry, /api/devices)
+      organizations.js← CRUD de organizações (/api/organizations)
+      environments.js ← CRUD de ambientes (/api/environments)
     ingest.js   ← ingestão compartilhada (valida + resolve deviceId + classifica)
-    registry.js ← registro persistente de ambientes/dispositivos (data/registry.json)
+    registry.js ← registro persistente: organizações → ambientes → dispositivos (data/registry.json)
     store.js    ← buffer circular em memória, por dispositivo (120 pontos cada)
     alerts.js   ← classificação dos níveis (limiares por dispositivo)
     simulator.js← gerador de leituras fake (fallback; aceita DEVICE_ID)
@@ -150,7 +152,11 @@ Definida em `server/alerts.js`. Cada dispositivo tem seus próprios limiares (`w
 | --- | --- | --- |
 | `/api/noise` | POST | Recebe leitura `{ "deviceid": 10034, "db": 72.4, "timestamp": 1700000000000 }` (deviceid opcional → `default`; timestamp do dispositivo é respeitado) |
 | `/api/history` | GET | Retorna os pontos do dispositivo (`?deviceId=<id>`) |
-| `/api/registry` | GET | Ambientes + dispositivos cadastrados |
+| `/api/registry` | GET | Organizações + ambientes + dispositivos cadastrados |
+| `/api/organizations` | GET/POST | Lista (com contagens) / cria organização |
+| `/api/organizations/:id` | PUT/DELETE | Edita / remove organização (409 se tiver ambientes) |
+| `/api/environments` | GET/POST | Lista (`?orgId=` filtra) / cria ambiente |
+| `/api/environments/:id` | PUT/DELETE | Edita / remove ambiente (409 se tiver dispositivos) |
 | `/api/devices` | GET/POST | Lista / cria dispositivo |
 | `/api/devices/:id` | PUT/DELETE | Edita / remove dispositivo |
 | `/events` | GET | Server-Sent Events ao vivo (`?deviceId=<id>` para filtrar) |
