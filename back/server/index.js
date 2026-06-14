@@ -4,6 +4,7 @@ const express = require('express');
 const WebSocket = require('ws');
 const store = require('./store');
 const { ingest } = require('./ingest');
+const { init } = require('./db/init');
 const noiseRouter = require('./routes/noise');
 const devicesRouter = require('./routes/devices');
 const organizationsRouter = require('./routes/organizations');
@@ -84,18 +85,33 @@ wss.on('connection', (ws, req) => {
 
   ws.on('message', (raw) => {
     if (ws._isBrowser) return; // browser não ingere leituras
+    let msg;
     try {
-      const msg = JSON.parse(raw.toString());
-      // deviceid pode vir na mensagem (numérico) ou na query da conexão.
-      ingest({
-        deviceId: msg.deviceid ?? msg.deviceId ?? ws._deviceId,
-        db: msg.db,
-        timestamp: msg.timestamp,
-      });
-    } catch (_) {}
+      msg = JSON.parse(raw.toString());
+    } catch (_) { return; }
+    // deviceid pode vir na mensagem (numérico) ou na query da conexão.
+    ingest({
+      deviceId: msg.deviceid ?? msg.deviceId ?? ws._deviceId,
+      db: msg.db,
+      timestamp: msg.timestamp,
+    }).catch(() => {}); // ingestão por WS é best-effort
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`NoiseGuard server running at http://localhost:${PORT}`);
+// Error handler (captura rejeições dos handlers async via async-handler).
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({ error: 'Erro interno do servidor' });
 });
+
+// Inicializa o banco (schema + seed) e só então começa a aceitar conexões.
+init()
+  .then(() => {
+    server.listen(PORT, () => {
+      console.log(`NoiseGuard server running at http://localhost:${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error('Falha ao inicializar o banco de dados:', err);
+    process.exit(1);
+  });

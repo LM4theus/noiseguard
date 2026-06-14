@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: noiseguard
+      POSTGRES_PASSWORD: noiseguard
+      POSTGRES_DB: noiseguard
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Mapeado para 5433 no host para não conflitar com outro Postgres local.
+    # O server fala com o banco pela rede interna (db:5432), independente disto.
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U noiseguard -d noiseguard"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  server:
+    build:
+      context: .
+      dockerfile: back/Dockerfile
+    environment:
+      DATABASE_URL: postgres://noiseguard:noiseguard@db:5432/noiseguard
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Simulador de dispositivos — só sobe com o perfil "dev":
+  #   docker compose --profile dev up
+  # Envia leituras reais (por deviceId) ao servidor, para popular as telas
+  # enquanto não há ESP32 físico conectado.
+  simulator:
+    build:
+      context: .
+      dockerfile: back/Dockerfile
+    command: node back/server/simulator.js
+    environment:
+      SERVER_URL: http://server:3000
+    depends_on:
+      - server
+    profiles:
+      - dev
+
+volumes:
+  pgdata:

@@ -1,10 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const reg = require('../registry');
+const ah = require('../async-handler');
 
 const ID_RE = /^[A-Za-z0-9_-]{2,32}$/;
 
-// Valida/normaliza o corpo. Em modo `partial`, só valida campos presentes.
+// Valida/normaliza o formato (sem acessar o banco). Em modo `partial`, só
+// valida campos presentes. Existência de ambiente é checada no handler.
 function validate(body, { partial = false } = {}) {
   const errors = [];
   const out = {};
@@ -26,8 +28,8 @@ function validate(body, { partial = false } = {}) {
   }
 
   if (!partial || 'envId' in body) {
-    if (typeof body.envId !== 'string' || !reg.environmentExists(body.envId)) {
-      errors.push('Ambiente inválido');
+    if (typeof body.envId !== 'string' || !body.envId) {
+      errors.push('Ambiente é obrigatório');
     } else {
       out.envId = body.envId;
     }
@@ -62,36 +64,41 @@ function validate(body, { partial = false } = {}) {
   return { errors, out };
 }
 
-// Registro completo (ambientes + dispositivos) — consumido por toda a interface.
-router.get('/registry', (req, res) => {
-  res.json(reg.getRegistry());
-});
+router.get('/registry', ah(async (req, res) => {
+  res.json(await reg.getRegistry());
+}));
 
-router.get('/devices', (req, res) => {
-  res.json(reg.getRegistry().devices);
-});
+router.get('/devices', ah(async (req, res) => {
+  res.json((await reg.getRegistry()).devices);
+}));
 
-router.post('/devices', (req, res) => {
+router.post('/devices', ah(async (req, res) => {
   const { errors, out } = validate(req.body);
   if (errors.length) return res.status(400).json({ errors });
-  if (reg.getDevice(out.id)) {
+  if (!(await reg.environmentExists(out.envId))) {
+    return res.status(400).json({ errors: ['Ambiente inválido'] });
+  }
+  if (await reg.getDevice(out.id)) {
     return res.status(409).json({ errors: ['Já existe um dispositivo com esse DeviceID'] });
   }
-  res.status(201).json(reg.addDevice(out));
-});
+  res.status(201).json(await reg.addDevice(out));
+}));
 
-router.put('/devices/:id', (req, res) => {
+router.put('/devices/:id', ah(async (req, res) => {
   const { errors, out } = validate(req.body, { partial: true });
   if (errors.length) return res.status(400).json({ errors });
-  const updated = reg.updateDevice(req.params.id, out);
+  if (out.envId && !(await reg.environmentExists(out.envId))) {
+    return res.status(400).json({ errors: ['Ambiente inválido'] });
+  }
+  const updated = await reg.updateDevice(req.params.id, out);
   if (!updated) return res.status(404).json({ errors: ['Dispositivo não encontrado'] });
   res.json(updated);
-});
+}));
 
-router.delete('/devices/:id', (req, res) => {
-  const ok = reg.deleteDevice(req.params.id);
+router.delete('/devices/:id', ah(async (req, res) => {
+  const ok = await reg.deleteDevice(req.params.id);
   if (!ok) return res.status(404).json({ errors: ['Dispositivo não encontrado'] });
   res.json({ status: 'ok' });
-});
+}));
 
 module.exports = router;

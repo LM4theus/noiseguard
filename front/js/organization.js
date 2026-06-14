@@ -1,7 +1,7 @@
 // Detalhe de uma organização: seus ambientes monitorados (escopado por ?id=).
 import {
-  loadRegistry, getOrganization, getEnvironmentsByOrg, typeLabel,
-  environmentAvg, band, simulateStep,
+  loadRegistry, refreshReadings, getOrganization, getEnvironmentsByOrg,
+  typeLabel, environmentAvg, band,
 } from './data.js';
 
 const grid    = document.getElementById('env-grid');
@@ -24,7 +24,8 @@ function render() {
 
   for (const env of envs) {
     const avg = environmentAvg(env);
-    const cls = band(avg);
+    const hasData = avg != null;
+    const cls = hasData ? band(avg) : 'nd';
     const activeDevices = env.devices.length;
 
     const a = document.createElement('a');
@@ -39,7 +40,7 @@ function render() {
         </div>
       </div>
       <div class="env-card-metric">
-        <span class="env-db">${avg.toFixed(1)}</span>
+        <span class="env-db">${hasData ? avg.toFixed(1) : '—'}</span>
         <span class="env-db-unit">dB</span>
         <span class="band-dot ${cls}"></span>
       </div>
@@ -69,6 +70,7 @@ function render() {
 
   document.title = `NoiseGuard — ${org.name}`;
   titleEl.textContent = `${org.name} — Ambientes`;
+  await refreshReadings();
   render();
-  setInterval(() => { simulateStep(); render(); }, 2000);
+  setInterval(async () => { await refreshReadings(); render(); }, 2000);
 })();

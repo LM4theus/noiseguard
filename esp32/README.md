@@ -6,7 +6,7 @@ sinal analógico (microfone/sensor de ruído), converte para um valor aproximado
 
 ```json
 POST http://<host>:<porta>/api/noise
-{"deviceid":10034,"db":97.3,"timestamp":1700000000000}
+{"deviceid":10034,"db":97.3,"timestamp":1700000000000,"battery":87}
 ```
 
 > **Nota sobre o formato:** o servidor (`back/server/routes/noise.js`) valida `db`
@@ -33,6 +33,8 @@ POST http://<host>:<porta>/api/noise
 - **Buffer offline (store-and-forward):** se o WiFi cair ou o servidor ficar
   indisponível, as leituras são guardadas num **buffer circular em RAM** e
   reenviadas (com a hora original) assim que a conexão volta.
+- **Medição de bateria:** lê a tensão da bateria no ADC1 (via divisor) e inclui
+  o nível em `%` no campo `battery` do JSON.
 
 ---
 
@@ -42,6 +44,7 @@ POST http://<host>:<porta>/api/noise
 |---|---|---|
 | Sinal analógico | **GPIO34** (ADC1_CH6) | Entrada apenas; ideal para sensor. Atenuação 12 dB (~0–3,1 V) |
 | Botão de configuração | **GPIO4** | Botão entre o pino e o **GND**, ativo em zero. Pull-up interno habilitado |
+| Bateria (ADC) | **GPIO35** (ADC1_CH7) | Tensão da bateria via **divisor resistivo**. Deve ser canal do **ADC1** (ADC2 não funciona com WiFi) |
 
 > **Por que não GPIO0 para o botão?** Em nível baixo no boot, o GPIO0 coloca a ROM
 > do ESP32 em modo download UART. Por isso o default é o **GPIO4**. Ambos os pinos
@@ -171,6 +174,40 @@ A ~1 leitura/s, 10.922 eventos cobrem **~3 horas** de queda de rede.
 
 ---
 
+## Medição de bateria
+
+O firmware lê a tensão da bateria no **ADC1** e envia o nível em `%` no campo
+`battery` do JSON. Habilitada por padrão (`NG_BATTERY_ENABLE`).
+
+**Ligação:** como uma LiPo de 1 célula chega a 4,2 V (acima dos ~3,3 V do ADC), é
+obrigatório um **divisor resistivo** entre a bateria e o pino. Com dois resistores
+iguais (R–R), a razão é 2,00 → `NG_BATT_DIVIDER_X100 = 200`.
+
+```
+Vbat ──[ R ]──┬──[ R ]── GND
+              │
+            GPIO35 (ADC1_CH7)
+```
+
+**Parâmetros** (`idf.py menuconfig`):
+
+| Opção | Default | Descrição |
+|---|---|---|
+| `NG_BATT_ADC_CHANNEL` | `7` (GPIO35) | Canal do ADC1. **Não** use o canal do microfone (6) |
+| `NG_BATT_DIVIDER_X100` | `200` | Razão do divisor ×100 (`Vbat = Vadc × valor/100`) |
+| `NG_BATT_MIN_MV` | `3300` | Tensão considerada 0% |
+| `NG_BATT_MAX_MV` | `4200` | Tensão considerada 100% |
+
+Notas:
+- O `%` é um mapeamento **linear** entre min/max — aproximado (a curva real da
+  LiPo não é linear), mas suficiente para indicação.
+- Para leituras **bufferizadas** (offline), o `battery` enviado é o nível **atual**
+  no momento do reenvio (não é armazenado por leitura, para economizar RAM).
+- O servidor atual ignora campos extras (como `deviceid` e `battery`); para exibir
+  no dashboard seria preciso estendê-lo.
+
+---
+
 ## Estrutura do projeto
 
 ```
@@ -189,7 +226,9 @@ esp32/
     ├── sender.c/.h           # POST JSON para o servidor
     ├── status_led.c/.h       # LED de status (padrões de piscada)
     ├── time_sync.c/.h        # sincronização de hora via NTP/SNTP
-    └── data_buffer.c/.h      # buffer circular em RAM (store-and-forward)
+    ├── data_buffer.c/.h      # buffer circular em RAM (store-and-forward)
+    ├── adc1.c/.h             # unidade ADC1 compartilhada (mic + bateria)
+    └── battery.c/.h          # medição de bateria (ADC1 + divisor)
 ```
 
 ---

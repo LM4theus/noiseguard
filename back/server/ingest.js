@@ -1,6 +1,6 @@
 // Ingestão de uma leitura de ruído, compartilhada entre o endpoint HTTP
 // (/api/noise) e o WebSocket (/ws). Valida o dB, resolve o dispositivo no
-// registro, classifica com os limiares dele e grava no store por dispositivo.
+// registro, classifica com os limiares dele e grava no Postgres.
 const store = require('./store');
 const reg = require('./registry');
 const { classify } = require('./alerts');
@@ -8,7 +8,7 @@ const { classify } = require('./alerts');
 // Leituras sem deviceId (firmware legado) caem neste dispositivo virtual.
 const DEFAULT_DEVICE_ID = 'default';
 
-function ingest({ deviceId, db, timestamp }) {
+async function ingest({ deviceId, db, timestamp }) {
   if (typeof db !== 'number' || Number.isNaN(db) || db < 0 || db > 140) {
     return { ok: false, code: 400, error: 'db deve ser um número entre 0 e 140' };
   }
@@ -20,7 +20,7 @@ function ingest({ deviceId, db, timestamp }) {
     // O dispositivo envia o id como número (ex.: 10034); o registro guarda
     // ids como string, então normalizamos para a busca.
     const key = String(deviceId);
-    const device = reg.getDevice(key);
+    const device = await reg.getDevice(key);
     if (!device) {
       return { ok: false, code: 404, error: `deviceId "${key}" não registrado` };
     }
@@ -36,7 +36,7 @@ function ingest({ deviceId, db, timestamp }) {
 
   const level = classify(db, thresholds);
   const point = { db, timestamp: ts, level };
-  store.add(id, point);
+  await store.add(id, point);
 
   return { ok: true, deviceId: id, point, level };
 }

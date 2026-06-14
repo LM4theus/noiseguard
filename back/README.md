@@ -4,33 +4,39 @@ Monitor de ruído em tempo real para ambientes internos (salas de aula, hospitai
 
 ---
 
-## Como rodar
+## Como rodar (Docker — recomendado)
 
-### 1. Instalar dependências e iniciar o servidor
-
-```bash
-cd back
-npm install
-npm start
-```
-
-Acesse o dashboard em **<http://localhost:3000>**
-
-### 2. Capturar áudio pelo microfone (principal)
-
-No dashboard, clique no botão **🎤 Microfone**. O browser solicita permissão de áudio e começa a enviar leituras ao servidor a cada 500 ms via Web Audio API.
-
-### 3. Modo simulador (fallback sem microfone)
-
-Com o servidor já rodando, execute em outro terminal:
+Tudo sobe com Docker Compose (Node + PostgreSQL) a partir da raiz do repositório:
 
 ```bash
-npm run simulate
+docker compose up -d --build
 ```
 
-Envia leituras aleatórias via HTTP POST a cada 750 ms. Útil para testes sem microfone disponível.
+Acesse o dashboard em **<http://localhost:3000>**. O banco é criado e populado
+(seed) automaticamente no primeiro boot; os dados ficam no volume `pgdata` e
+sobrevivem a reinícios.
 
-### 4. Integração com ESP32
+### Popular com dados (simulador de dispositivos)
+
+Sem ESP32 físico, suba o simulador (perfil `dev`), que envia leituras **reais**
+para todos os dispositivos cadastrados:
+
+```bash
+docker compose --profile dev up -d
+```
+
+Para parar tudo: `docker compose down` (ou `down -v` para zerar o banco também).
+
+> **Rodar sem Docker:** é preciso um PostgreSQL acessível e a variável
+> `DATABASE_URL` (ex.: `postgres://noiseguard:noiseguard@localhost:5432/noiseguard`).
+> Então `cd back && npm install && npm start`. O Docker já cuida disso.
+
+### Capturar áudio pelo microfone
+
+No monitor de um dispositivo, clique em **🎤 Microfone**. O browser pede permissão
+de áudio e passa a enviar leituras (com o `deviceId` daquela tela) a cada 500 ms.
+
+### Integração com ESP32
 
 Configure o firmware do ESP32 com:
 
@@ -70,23 +76,28 @@ curl -X POST http://localhost:3000/api/noise \
 ### Arquitetura geral
 
 ```text
-front/          ← interface web (HTML + JS puro, sem build)
+docker-compose.yml ← db (PostgreSQL) + server + simulator (perfil dev)
 back/
+  Dockerfile
   server/
-    index.js    ← servidor Express + WebSocket + SSE
+    index.js        ← Express + WebSocket + SSE (init do banco no boot)
+    db/
+      pool.js       ← conexão com o Postgres (DATABASE_URL)
+      init.js       ← cria o schema e faz o seed inicial (idempotente)
     routes/
-      noise.js        ← rotas de leitura (/api/noise, /api/history)
+      noise.js        ← leituras (/api/noise, /api/history, /api/readings/latest)
       devices.js      ← CRUD de dispositivos (/api/registry, /api/devices)
       organizations.js← CRUD de organizações (/api/organizations)
       environments.js ← CRUD de ambientes (/api/environments)
     ingest.js   ← ingestão compartilhada (valida + resolve deviceId + classifica)
-    registry.js ← registro persistente: organizações → ambientes → dispositivos (data/registry.json)
-    store.js    ← buffer circular em memória, por dispositivo (120 pontos cada)
+    registry.js ← cadastro (organizações → ambientes → dispositivos) no Postgres
+    store.js    ← leituras (série temporal) no Postgres + emitter p/ tempo real
     alerts.js   ← classificação dos níveis (limiares por dispositivo)
-    simulator.js← gerador de leituras fake (fallback; aceita DEVICE_ID)
+    simulator.js← envia leituras reais p/ todos os dispositivos (perfil dev)
+front/          ← interface web (HTML + JS puro, sem build)
 ```
 
-O servidor Express (porta 3000) serve os arquivos de `front/` como arquivos estáticos. Não há processo separado para o frontend.
+O servidor Express (porta 3000) serve os arquivos de `front/` como arquivos estáticos e persiste tudo (cadastro + leituras) no PostgreSQL. Não há processo separado para o frontend.
 
 ### Fluxo de uma leitura
 
@@ -100,7 +111,7 @@ POST /api/noise  {"deviceid": 10034, "db": 72.4, "timestamp": 1700000000000}
 ingest() → resolve deviceid no registro → classify(db, limiares do dispositivo) → "ATENCAO"
         │
         ▼
-store.add(deviceId, point)  → buffer circular POR dispositivo (máx. 120 pontos, sem persistência)
+store.add(deviceId, point)  → INSERT na tabela readings (Postgres, persistido)
         │
         ▼
 emitter.emit('data', { deviceId, point })
@@ -132,9 +143,9 @@ Monitor do dispositivo atualiza gauge, gráfico e tabela de eventos
 - Se o SSE falhar 3 vezes seguidas, cai em modo de **polling HTTP** (GET `/api/history?deviceId=<id>` a cada 1 s)
 - Ao reconectar o SSE, o polling é cancelado automaticamente
 
-### Buffer e histórico
+### Persistência e histórico
 
-`store.js` mantém um buffer circular de 120 pontos **por dispositivo** em memória. Os dados são perdidos ao reiniciar o servidor. `GET /api/history?deviceId=<id>` retorna os pontos daquele dispositivo na ordem cronológica.
+Tudo é persistido no **PostgreSQL** (tabelas `organizations`, `environments`, `devices`, `readings`), no volume Docker `pgdata` — sobrevive a reinícios. `GET /api/history?deviceId=<id>` retorna os últimos 120 pontos daquele dispositivo (ordem cronológica) e `GET /api/readings/latest` retorna a última leitura de cada dispositivo (consumido pelas telas de lista para mostrar **dB real**).
 
 ### Classificação de níveis
 

@@ -524,6 +524,7 @@ body {
 .band-dot.ok   { background: var(--color-ok); }
 .band-dot.warn { background: var(--color-warn); }
 .band-dot.crit { background: var(--color-crit); }
+.band-dot.nd   { background: var(--text-muted); opacity: 0.5; }
 
 /* ── Tela 1: grade de ambientes ── */
 .env-grid {

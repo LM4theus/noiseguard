@@ -16,6 +16,7 @@
 #include "status_led.h"
 #include "time_sync.h"
 #include "data_buffer.h"
+#include "battery.h"
 
 static const char *TAG = "main";
 
@@ -84,14 +85,16 @@ static void run_config_mode(void)
  *
  * @return true se o buffer ficou vazio (tudo enviado).
  */
-static bool flush_buffer(const app_config_t *cfg)
+static bool flush_buffer(const app_config_t *cfg, int battery_pct)
 {
     int sent = 0;
     float db;
     int64_t ts_ms;
 
     while (sent < FLUSH_MAX_PER_CYCLE && data_buffer_peek_oldest(&db, &ts_ms)) {
-        if (sender_post_reading(cfg, db, ts_ms) != ESP_OK) {
+        // Bateria nao e armazenada por leitura (economia de RAM): usa o nivel
+        // atual no momento do reenvio.
+        if (sender_post_reading(cfg, db, ts_ms, battery_pct) != ESP_OK) {
             break;  // servidor caiu de novo; mantem no buffer
         }
         data_buffer_pop_oldest();
@@ -135,6 +138,9 @@ static void run_normal_mode(const app_config_t *cfg)
 
     ESP_ERROR_CHECK(sensor_init());
     data_buffer_init();
+#if CONFIG_NG_BATTERY_ENABLE
+    battery_init();
+#endif
 
     TickType_t last = xTaskGetTickCount();
     const TickType_t period = pdMS_TO_TICKS(cfg->interval_ms);
@@ -143,17 +149,22 @@ static void run_normal_mode(const app_config_t *cfg)
         float db = sensor_read_db();
         int64_t ts_ms = time_sync_now_ms();
 
+        int battery_pct = -1;  // -1 => campo "battery" omitido no JSON
+#if CONFIG_NG_BATTERY_ENABLE
+        battery_pct = battery_percent();
+#endif
+
         if (!wifi_manager_is_connected()) {
             // Offline: guarda para enviar depois.
             data_buffer_push(db, ts_ms);
         } else {
             // Online: drena pendentes primeiro (mantem ordem cronologica).
-            bool drained = flush_buffer(cfg);
+            bool drained = flush_buffer(cfg, battery_pct);
             if (!drained) {
                 // Ainda ha pendentes (servidor indisponivel): enfileira a
                 // atual em vez de fura-la na frente das mais antigas.
                 data_buffer_push(db, ts_ms);
-            } else if (sender_post_reading(cfg, db, ts_ms) != ESP_OK) {
+            } else if (sender_post_reading(cfg, db, ts_ms, battery_pct) != ESP_OK) {
                 // Buffer vazio mas o POST da atual falhou: guarda no buffer.
                 data_buffer_push(db, ts_ms);
             }

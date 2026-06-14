@@ -4,11 +4,13 @@ idf_component_register(
         "app_config.c"
         "wifi_manager.c"
         "config_portal.c"
+        "adc1.c"
         "sensor.c"
         "sender.c"
         "status_led.c"
         "time_sync.c"
         "data_buffer.c"
+        "battery.c"
     INCLUDE_DIRS
         "include"
     REQUIRES

@@ -1,88 +1,23 @@
-// Registro persistente de organizações, ambientes e dispositivos.
+// Camada de dados de cadastro sobre o Postgres.
 // Hierarquia: Organização → N Ambientes → N Dispositivos.
-// É a fonte única de verdade consumida pela interface. Persiste em
-// data/registry.json.
-const fs = require('fs');
-const path = require('path');
-
-const DATA_DIR = path.join(__dirname, 'data');
-const FILE = path.join(DATA_DIR, 'registry.json');
+const pool = require('./db/pool');
 
 const TYPE_ICON = { school: '🏫', industrial: '🏭', office: '🏢', hospital: '🏥' };
 
-// Valores iniciais usados na primeira execução (sem arquivo de persistência).
-const SEED = {
-  organizations: [
-    { id: 'org-demo', name: 'Organização Demo', active: true },
-  ],
-  environments: [
-    { id: 'school-1',   name: 'Escola Central',        type: 'school',     icon: '🏫', orgId: 'org-demo' },
-    { id: 'indust-1',   name: 'Galpão Industrial A',   type: 'industrial', icon: '🏭', orgId: 'org-demo' },
-    { id: 'office-1',   name: 'Escritório Open Space', type: 'office',     icon: '🏢', orgId: 'org-demo' },
-    { id: 'hospital-1', name: 'Hospital Geral',        type: 'hospital',   icon: '🏥', orgId: 'org-demo' },
-  ],
-  devices: [
-    { id: 's101', name: 'Sala 101',           envId: 'school-1',   base: 55, warnThreshold: 70, critThreshold: 85, intervalMs: 1000, active: true },
-    { id: 's102', name: 'Sala 102',           envId: 'school-1',   base: 62, warnThreshold: 70, critThreshold: 85, intervalMs: 1000, active: true },
-    { id: 's103', name: 'Sala 103',           envId: 'school-1',   base: 50, warnThreshold: 70, critThreshold: 85, intervalMs: 1000, active: true },
-    { id: 'lab',  name: 'Lab de Ciências',    envId: 'school-1',   base: 70, warnThreshold: 70, critThreshold: 85, intervalMs: 1000, active: true },
-    { id: 'bib',  name: 'Biblioteca',         envId: 'school-1',   base: 40, warnThreshold: 60, critThreshold: 75, intervalMs: 1000, active: true },
-    { id: 'ref',  name: 'Refeitório',         envId: 'school-1',   base: 78, warnThreshold: 75, critThreshold: 90, intervalMs: 1000, active: true },
-    { id: 'l1',   name: 'Linha de Produção 1', envId: 'indust-1',  base: 84, warnThreshold: 80, critThreshold: 90, intervalMs: 1000, active: true },
-    { id: 'l2',   name: 'Linha de Produção 2', envId: 'indust-1',  base: 88, warnThreshold: 80, critThreshold: 90, intervalMs: 1000, active: true },
-    { id: 'comp', name: 'Compressores',        envId: 'indust-1',  base: 95, warnThreshold: 85, critThreshold: 95, intervalMs: 1000, active: true },
-    { id: 'exp',  name: 'Expedição',           envId: 'indust-1',  base: 76, warnThreshold: 80, critThreshold: 90, intervalMs: 1000, active: true },
-    { id: 'alm',  name: 'Almoxarifado',        envId: 'indust-1',  base: 62, warnThreshold: 80, critThreshold: 90, intervalMs: 1000, active: true },
-    { id: 'os',   name: 'Open Space',          envId: 'office-1',  base: 63, warnThreshold: 65, critThreshold: 80, intervalMs: 1000, active: true },
-    { id: 'sr',   name: 'Sala de Reunião',     envId: 'office-1',  base: 58, warnThreshold: 65, critThreshold: 80, intervalMs: 1000, active: true },
-    { id: 'copa', name: 'Copa',                envId: 'office-1',  base: 64, warnThreshold: 65, critThreshold: 80, intervalMs: 1000, active: true },
-    { id: 'rec',  name: 'Recepção',            envId: 'hospital-1', base: 58, warnThreshold: 55, critThreshold: 70, intervalMs: 1000, active: true },
-    { id: 'uti',  name: 'UTI',                 envId: 'hospital-1', base: 45, warnThreshold: 50, critThreshold: 60, intervalMs: 1000, active: true },
-    { id: 'enfa', name: 'Enfermaria A',        envId: 'hospital-1', base: 52, warnThreshold: 55, critThreshold: 70, intervalMs: 1000, active: true },
-    { id: 'enfb', name: 'Enfermaria B',        envId: 'hospital-1', base: 54, warnThreshold: 55, critThreshold: 70, intervalMs: 1000, active: true },
-    { id: 'cc',   name: 'Centro Cirúrgico',    envId: 'hospital-1', base: 48, warnThreshold: 50, critThreshold: 65, intervalMs: 1000, active: true },
-    { id: 'href', name: 'Refeitório',          envId: 'hospital-1', base: 61, warnThreshold: 65, critThreshold: 80, intervalMs: 1000, active: true },
-  ],
-};
-
-let data = null;
-
-function load() {
-  if (data) return data;
-  try {
-    data = JSON.parse(fs.readFileSync(FILE, 'utf8'));
-  } catch {
-    data = JSON.parse(JSON.stringify(SEED));
-  }
-  migrate();
-  return data;
-}
-
-// Garante a estrutura nova em arquivos antigos (sem organizations/orgId).
-function migrate() {
-  let changed = false;
-  if (!Array.isArray(data.organizations)) { data.organizations = []; changed = true; }
-  if (data.organizations.length === 0) {
-    data.organizations.push({ id: 'org-default', name: 'Organização Padrão', active: true });
-    changed = true;
-  }
-  const defaultOrg = data.organizations[0].id;
-  for (const env of data.environments) {
-    if (!env.orgId) { env.orgId = defaultOrg; changed = true; }
-  }
-  if (changed) save();
-}
-
-function save() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(FILE, JSON.stringify(data, null, 2));
-}
+// ── Mapeamento snake_case (DB) → camelCase (API/front) ─────────
+const mapOrg = r => ({ id: r.id, name: r.name, active: r.active });
+const mapEnv = r => ({ id: r.id, name: r.name, type: r.type, icon: r.icon, orgId: r.org_id });
+const mapDevice = r => ({
+  id: r.id, name: r.name, envId: r.env_id,
+  base: r.base, warnThreshold: r.warn_threshold, critThreshold: r.crit_threshold,
+  intervalMs: r.interval_ms, active: r.active,
+});
 
 // ── Helpers de id ──────────────────────────────────────────────
 function slugify(s) {
   const from = 'àáâãäçèéêëìíîïñòóôõöùúûüý';
   const to   = 'aaaaaceeeeiiiinooooouuuuy';
-  let str = (s || '').toString().normalize('NFC').toLowerCase();
+  const str = (s || '').toString().normalize('NFC').toLowerCase();
   let out = '';
   for (const ch of str) {
     const i = from.indexOf(ch);
@@ -102,136 +37,180 @@ function uniqueId(base, existingIds) {
   return `${base}-${n}`;
 }
 
-function getRegistry() {
-  return load();
+// ── Registro completo (árvore para o front) ────────────────────
+async function getRegistry() {
+  const [orgs, envs, devs] = await Promise.all([
+    pool.query('SELECT * FROM organizations ORDER BY name'),
+    pool.query('SELECT * FROM environments ORDER BY name'),
+    pool.query('SELECT * FROM devices ORDER BY name'),
+  ]);
+  return {
+    organizations: orgs.rows.map(mapOrg),
+    environments: envs.rows.map(mapEnv),
+    devices: devs.rows.map(mapDevice),
+  };
 }
 
 // ── Contagens ──────────────────────────────────────────────────
-function countEnvironments(orgId) {
-  return load().environments.filter(e => e.orgId === orgId).length;
+async function countEnvironments(orgId) {
+  const { rows } = await pool.query('SELECT count(*)::int AS n FROM environments WHERE org_id=$1', [orgId]);
+  return rows[0].n;
 }
 
-function countDevicesByEnv(envId) {
-  return load().devices.filter(d => d.envId === envId).length;
-}
-
-function countDevicesByOrg(orgId) {
-  const envIds = new Set(load().environments.filter(e => e.orgId === orgId).map(e => e.id));
-  return data.devices.filter(d => envIds.has(d.envId)).length;
+async function countDevicesByEnv(envId) {
+  const { rows } = await pool.query('SELECT count(*)::int AS n FROM devices WHERE env_id=$1', [envId]);
+  return rows[0].n;
 }
 
 // ── Organizações ───────────────────────────────────────────────
-function getOrganization(id) {
-  return load().organizations.find(o => o.id === id) ?? null;
+async function listOrganizationsWithCounts() {
+  const { rows } = await pool.query(`
+    SELECT o.*,
+      (SELECT count(*)::int FROM environments e WHERE e.org_id = o.id) AS environments,
+      (SELECT count(*)::int FROM devices d
+         JOIN environments e2 ON d.env_id = e2.id
+        WHERE e2.org_id = o.id) AS devices
+    FROM organizations o
+    ORDER BY o.name
+  `);
+  return rows.map(r => ({ ...mapOrg(r), environments: r.environments, devices: r.devices }));
 }
 
-function organizationExists(id) {
-  return load().organizations.some(o => o.id === id);
+async function getOrganization(id) {
+  const { rows } = await pool.query('SELECT * FROM organizations WHERE id=$1', [id]);
+  return rows[0] ? mapOrg(rows[0]) : null;
 }
 
-function addOrganization({ name, active }) {
-  load();
-  const id = uniqueId(`org-${slugify(name)}`, data.organizations.map(o => o.id));
-  const rec = { id, name, active: active !== false };
-  data.organizations.push(rec);
-  save();
-  return rec;
+async function organizationExists(id) {
+  const { rows } = await pool.query('SELECT 1 FROM organizations WHERE id=$1', [id]);
+  return rows.length > 0;
 }
 
-function updateOrganization(id, patch) {
-  load();
-  const o = data.organizations.find(x => x.id === id);
-  if (!o) return null;
-  if (patch.name != null) o.name = patch.name;
-  if ('active' in patch) o.active = !!patch.active;
-  save();
-  return o;
+async function addOrganization({ name, active }) {
+  const { rows } = await pool.query('SELECT id FROM organizations');
+  const id = uniqueId(`org-${slugify(name)}`, rows.map(r => r.id));
+  const isActive = active !== false;
+  await pool.query('INSERT INTO organizations(id, name, active) VALUES ($1,$2,$3)', [id, name, isActive]);
+  return { id, name, active: isActive };
 }
 
-function deleteOrganization(id) {
-  load();
-  const idx = data.organizations.findIndex(o => o.id === id);
-  if (idx === -1) return { ok: false, code: 404 };
-  if (countEnvironments(id) > 0) return { ok: false, code: 409 };
-  data.organizations.splice(idx, 1);
-  save();
+async function updateOrganization(id, patch) {
+  const cur = await getOrganization(id);
+  if (!cur) return null;
+  const name = patch.name != null ? patch.name : cur.name;
+  const active = 'active' in patch ? !!patch.active : cur.active;
+  await pool.query('UPDATE organizations SET name=$2, active=$3 WHERE id=$1', [id, name, active]);
+  return { id, name, active };
+}
+
+async function deleteOrganization(id) {
+  const exists = await organizationExists(id);
+  if (!exists) return { ok: false, code: 404 };
+  if (await countEnvironments(id) > 0) return { ok: false, code: 409 };
+  await pool.query('DELETE FROM organizations WHERE id=$1', [id]);
   return { ok: true };
 }
 
 // ── Ambientes ──────────────────────────────────────────────────
-function getEnvironment(id) {
-  return load().environments.find(e => e.id === id) ?? null;
+async function listEnvironmentsWithCounts(orgId) {
+  const params = [];
+  let where = '';
+  if (orgId) { params.push(orgId); where = 'WHERE e.org_id = $1'; }
+  const { rows } = await pool.query(`
+    SELECT e.*,
+      (SELECT count(*)::int FROM devices d WHERE d.env_id = e.id) AS devices
+    FROM environments e
+    ${where}
+    ORDER BY e.name
+  `, params);
+  return rows.map(r => ({ ...mapEnv(r), devices: r.devices }));
 }
 
-function environmentExists(id) {
-  return load().environments.some(e => e.id === id);
+async function getEnvironment(id) {
+  const { rows } = await pool.query('SELECT * FROM environments WHERE id=$1', [id]);
+  return rows[0] ? mapEnv(rows[0]) : null;
 }
 
-function addEnvironment({ name, type, icon, orgId }) {
-  load();
-  const id = uniqueId(slugify(name), data.environments.map(e => e.id));
-  const rec = { id, name, type, icon: icon || TYPE_ICON[type] || '📍', orgId };
-  data.environments.push(rec);
-  save();
-  return rec;
+async function environmentExists(id) {
+  const { rows } = await pool.query('SELECT 1 FROM environments WHERE id=$1', [id]);
+  return rows.length > 0;
 }
 
-function updateEnvironment(id, patch) {
-  load();
-  const e = data.environments.find(x => x.id === id);
-  if (!e) return null;
-  for (const k of ['name', 'type', 'icon', 'orgId']) {
-    if (k in patch && patch[k] != null) e[k] = patch[k];
-  }
-  save();
-  return e;
+async function addEnvironment({ name, type, icon, orgId }) {
+  const { rows } = await pool.query('SELECT id FROM environments');
+  const id = uniqueId(slugify(name), rows.map(r => r.id));
+  const ic = icon || TYPE_ICON[type] || '📍';
+  await pool.query(
+    'INSERT INTO environments(id, name, type, icon, org_id) VALUES ($1,$2,$3,$4,$5)',
+    [id, name, type, ic, orgId],
+  );
+  return mapEnv({ id, name, type, icon: ic, org_id: orgId });
 }
 
-function deleteEnvironment(id) {
-  load();
-  const idx = data.environments.findIndex(e => e.id === id);
-  if (idx === -1) return { ok: false, code: 404 };
-  if (countDevicesByEnv(id) > 0) return { ok: false, code: 409 };
-  data.environments.splice(idx, 1);
-  save();
+async function updateEnvironment(id, patch) {
+  const cur = await getEnvironment(id);
+  if (!cur) return null;
+  const name  = patch.name  != null ? patch.name  : cur.name;
+  const type  = patch.type  != null ? patch.type  : cur.type;
+  const icon  = patch.icon  != null ? patch.icon  : cur.icon;
+  const orgId = patch.orgId != null ? patch.orgId : cur.orgId;
+  await pool.query(
+    'UPDATE environments SET name=$2, type=$3, icon=$4, org_id=$5 WHERE id=$1',
+    [id, name, type, icon, orgId],
+  );
+  return mapEnv({ id, name, type, icon, org_id: orgId });
+}
+
+async function deleteEnvironment(id) {
+  const exists = await environmentExists(id);
+  if (!exists) return { ok: false, code: 404 };
+  if (await countDevicesByEnv(id) > 0) return { ok: false, code: 409 };
+  await pool.query('DELETE FROM environments WHERE id=$1', [id]);
   return { ok: true };
 }
 
 // ── Dispositivos ───────────────────────────────────────────────
-function getDevice(id) {
-  return load().devices.find(d => d.id === id) ?? null;
+async function getDevice(id) {
+  const { rows } = await pool.query('SELECT * FROM devices WHERE id=$1', [id]);
+  return rows[0] ? mapDevice(rows[0]) : null;
 }
 
-function addDevice(device) {
-  load();
-  data.devices.push(device);
-  save();
-  return device;
+async function addDevice(d) {
+  await pool.query(
+    `INSERT INTO devices(id, name, env_id, base, warn_threshold, crit_threshold, interval_ms, active)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+    [d.id, d.name, d.envId, d.base, d.warnThreshold, d.critThreshold, d.intervalMs, d.active !== false],
+  );
+  return d;
 }
 
-function updateDevice(id, patch) {
-  load();
-  const device = data.devices.find(d => d.id === id);
-  if (!device) return null;
-  Object.assign(device, patch, { id });
-  save();
-  return device;
+async function updateDevice(id, patch) {
+  const cur = await getDevice(id);
+  if (!cur) return null;
+  const m = { ...cur, ...patch, id };
+  await pool.query(
+    `UPDATE devices SET name=$2, env_id=$3, base=$4, warn_threshold=$5,
+       crit_threshold=$6, interval_ms=$7, active=$8 WHERE id=$1`,
+    [id, m.name, m.envId, m.base, m.warnThreshold, m.critThreshold, m.intervalMs, m.active !== false],
+  );
+  return m;
 }
 
-function deleteDevice(id) {
-  load();
-  const idx = data.devices.findIndex(d => d.id === id);
-  if (idx === -1) return false;
-  data.devices.splice(idx, 1);
-  save();
+async function deleteDevice(id) {
+  const cur = await getDevice(id);
+  if (!cur) return false;
+  await pool.query('DELETE FROM readings WHERE device_id=$1', [id]);
+  await pool.query('DELETE FROM devices WHERE id=$1', [id]);
   return true;
 }
 
 module.exports = {
   TYPE_ICON,
   getRegistry,
-  countEnvironments, countDevicesByEnv, countDevicesByOrg,
-  getOrganization, organizationExists, addOrganization, updateOrganization, deleteOrganization,
-  getEnvironment, environmentExists, addEnvironment, updateEnvironment, deleteEnvironment,
+  countEnvironments, countDevicesByEnv,
+  listOrganizationsWithCounts, getOrganization, organizationExists,
+  addOrganization, updateOrganization, deleteOrganization,
+  listEnvironmentsWithCounts, getEnvironment, environmentExists,
+  addEnvironment, updateEnvironment, deleteEnvironment,
   getDevice, addDevice, updateDevice, deleteDevice,
 };

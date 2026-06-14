@@ -21,21 +21,23 @@ esp_err_t sender_post_reading(const app_config_t *cfg, float db, int64_t ts_ms)
     }
 
     // O servidor NoiseGuard valida "db" como numero (0..140), por isso
-    // enviamos o valor numerico (e nao string). O "timestamp" (epoch ms,
-    // igual a Date.now()) e o da leitura: para leituras bufferizadas, e a
-    // hora original em que foram capturadas. ts_ms <= 0 omite o campo (o
-    // servidor entao carimba a hora ao receber).
-    char body[128];
-    int body_len;
-    if (ts_ms > 0) {
-        body_len = snprintf(body, sizeof(body),
-                            "{\"deviceid\":%lu,\"db\":%.1f,\"timestamp\":%lld}",
-                            (unsigned long)cfg->device_id, db, (long long)ts_ms);
-    } else {
-        body_len = snprintf(body, sizeof(body),
-                            "{\"deviceid\":%lu,\"db\":%.1f}",
+    // enviamos o valor numerico (e nao string). Campos opcionais:
+    //  - "timestamp": epoch ms da leitura (hora original; bufferizadas mantem
+    //    a hora de captura). ts_ms <= 0 omite (o servidor carimba ao receber).
+    //  - "battery": nivel em %. battery_pct < 0 omite.
+    char body[160];
+    int body_len = snprintf(body, sizeof(body),
+                            "{\"deviceid\":%lu,\"db\":%.1f",
                             (unsigned long)cfg->device_id, db);
+    if (ts_ms > 0) {
+        body_len += snprintf(body + body_len, sizeof(body) - body_len,
+                             ",\"timestamp\":%lld", (long long)ts_ms);
     }
+    if (battery_pct >= 0) {
+        body_len += snprintf(body + body_len, sizeof(body) - body_len,
+                             ",\"battery\":%d", battery_pct);
+    }
+    body_len += snprintf(body + body_len, sizeof(body) - body_len, "}");
 
     esp_http_client_config_t http_cfg = {
         .url = url,

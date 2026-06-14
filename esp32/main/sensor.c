@@ -5,6 +5,7 @@
 #include "esp_adc/adc_oneshot.h"
 #include "esp_adc/adc_cali.h"
 #include "esp_adc/adc_cali_scheme.h"
+#include "adc1.h"
 #include "sdkconfig.h"
 
 static const char *TAG = "sensor";
@@ -24,20 +25,17 @@ static const adc_channel_t s_channel = CONFIG_NG_ADC_CHANNEL;
 
 esp_err_t sensor_init(void)
 {
-    adc_oneshot_unit_init_cfg_t init_cfg = {
-        .unit_id = ADC_UNIT_1,
-    };
-    esp_err_t err = adc_oneshot_new_unit(&init_cfg, &s_adc);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "adc_oneshot_new_unit falhou: %s", esp_err_to_name(err));
-        return err;
+    s_adc = adc1_get_unit();
+    if (s_adc == NULL) {
+        ESP_LOGE(TAG, "ADC1 indisponivel");
+        return ESP_FAIL;
     }
 
     adc_oneshot_chan_cfg_t chan_cfg = {
         .atten = ADC_ATTEN_DB_12,             // ~0..3.1V (substitui o antigo DB_11)
         .bitwidth = ADC_BITWIDTH_DEFAULT,     // 12 bits no ESP32
     };
-    err = adc_oneshot_config_channel(s_adc, s_channel, &chan_cfg);
+    esp_err_t err = adc_oneshot_config_channel(s_adc, s_channel, &chan_cfg);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "config_channel falhou: %s", esp_err_to_name(err));
         return err;

@@ -1,7 +1,7 @@
 // Home — lista de organizações (topo da hierarquia).
 import {
-  loadRegistry, getOrganizations, orgAvg, orgEnvCount, orgDeviceCount,
-  band, simulateStep,
+  loadRegistry, refreshReadings, getOrganizations, orgAvg,
+  orgEnvCount, orgDeviceCount, band,
 } from './data.js';
 
 const grid = document.getElementById('org-grid');
@@ -16,7 +16,8 @@ function render() {
   grid.innerHTML = '';
   for (const org of orgs) {
     const avg = orgAvg(org);
-    const cls = band(avg);
+    const hasData = avg != null;
+    const cls = hasData ? band(avg) : 'nd';
 
     const a = document.createElement('a');
     a.className = `env-card ${cls}`;
@@ -30,7 +31,7 @@ function render() {
         </div>
       </div>
       <div class="env-card-metric">
-        <span class="env-db">${avg.toFixed(1)}</span>
+        <span class="env-db">${hasData ? avg.toFixed(1) : '—'}</span>
         <span class="env-db-unit">dB médio</span>
         <span class="band-dot ${cls}"></span>
       </div>
@@ -46,8 +47,9 @@ function render() {
 (async () => {
   try {
     await loadRegistry();
+    await refreshReadings();
     render();
-    setInterval(() => { simulateStep(); render(); }, 2000);
+    setInterval(async () => { await refreshReadings(); render(); }, 2000);
   } catch (_) {
     grid.innerHTML = '<p class="empty-msg">Não foi possível carregar as organizações. Verifique se o servidor está ativo.</p>';
   }

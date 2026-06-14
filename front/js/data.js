@@ -1,7 +1,6 @@
-// Acesso ao registro de ambientes/dispositivos servido pelo backend
-// (fonte única de verdade — ver back/server/registry.js).
-// As leituras de dB recebem uma simulação leve (random-walk) para a
-// interface parecer "viva"; a tela de Dispositivo também usa o feed real.
+// Acesso ao registro (organizações/ambientes/dispositivos) e às últimas
+// leituras REAIS de cada dispositivo, ambos servidos pelo backend.
+// (fonte única de verdade — ver back/server/registry.js e store.js).
 
 const BASE = 'http://localhost:3000';
 
@@ -58,9 +57,9 @@ export function orgEnvCount(org) {
 }
 
 export function orgAvg(org) {
-  const devices = orgDevices(org);
-  if (devices.length === 0) return 0;
-  return devices.reduce((acc, d) => acc + deviceDb(d), 0) / devices.length;
+  const vals = orgDevices(org).map(deviceDb).filter(v => v != null);
+  if (vals.length === 0) return null;
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
 }
 
 export function findDevice(deviceId) {
@@ -82,32 +81,27 @@ export function typeLabel(type) {
   return TYPE_LABEL[type] ?? type;
 }
 
-// ── Simulação de leitura (random-walk em torno do `base`) ──────────
-const liveDb = new Map();
+// ── Últimas leituras reais (por dispositivo) ───────────────────────
+// { [deviceId]: { db, level, timestamp } } — vinda de /api/readings/latest.
+let latest = {};
 
-function tick(device) {
-  const prev = liveDb.has(device.id) ? liveDb.get(device.id) : device.base;
-  const next = prev + (Math.random() - 0.5) * 3;
-  const clamped = Math.max(device.base - 6, Math.min(device.base + 6, next));
-  const bounded = Math.max(0, Math.min(120, clamped));
-  liveDb.set(device.id, bounded);
-  return bounded;
+export async function refreshReadings() {
+  latest = await fetch(`${BASE}/api/readings/latest`).then(r => r.json());
+  return latest;
 }
 
+// dB real da última leitura, ou null se o dispositivo ainda não enviou nada.
 export function deviceDb(device) {
-  return liveDb.has(device.id) ? liveDb.get(device.id) : device.base;
+  const r = latest[device.id];
+  return r ? r.db : null;
 }
 
-export function simulateStep() {
-  for (const env of environments) {
-    for (const d of env.devices) tick(d);
-  }
-}
-
+// Média do ambiente considerando apenas dispositivos COM leitura real.
+// Retorna null quando nenhum dispositivo tem dados.
 export function environmentAvg(env) {
-  if (env.devices.length === 0) return 0;
-  const sum = env.devices.reduce((acc, d) => acc + deviceDb(d), 0);
-  return sum / env.devices.length;
+  const vals = env.devices.map(deviceDb).filter(v => v != null);
+  if (vals.length === 0) return null;
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
 }
 
 // Faixas de cor conforme a legenda do protótipo:

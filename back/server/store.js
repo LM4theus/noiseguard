@@ -1,50 +1,42 @@
+// Leituras (série temporal) persistidas no Postgres + emitter para o tempo real.
 const EventEmitter = require('events');
+const pool = require('./db/pool');
 
-const CAPACITY = 120; // pontos retidos por dispositivo (sem persistência)
+const CAPACITY = 120; // pontos retornados no histórico por dispositivo
 
 const emitter = new EventEmitter();
 
-// deviceId -> buffer circular { buf, head, size }
-const buffers = new Map();
-
-function bufferFor(deviceId) {
-  let b = buffers.get(deviceId);
-  if (!b) {
-    b = { buf: [], head: 0, size: 0 };
-    buffers.set(deviceId, b);
-  }
-  return b;
-}
-
-function add(deviceId, point) {
-  const b = bufferFor(deviceId);
-  b.buf[b.head] = point;
-  b.head = (b.head + 1) % CAPACITY;
-  if (b.size < CAPACITY) b.size++;
+async function add(deviceId, point) {
+  await pool.query(
+    'INSERT INTO readings(device_id, db, level, ts) VALUES ($1,$2,$3,$4)',
+    [deviceId, point.db, point.level, point.timestamp],
+  );
   emitter.emit('data', { deviceId, point });
 }
 
-function getAll(deviceId) {
-  const b = buffers.get(deviceId);
-  if (!b || b.size === 0) return [];
-  if (b.size < CAPACITY) return b.buf.slice(0, b.size);
-  return [...b.buf.slice(b.head), ...b.buf.slice(0, b.head)];
+// Histórico de um dispositivo, em ordem cronológica (mais antigo → mais novo).
+async function getAll(deviceId) {
+  const { rows } = await pool.query(
+    'SELECT db, level, ts FROM readings WHERE device_id=$1 ORDER BY ts DESC LIMIT $2',
+    [deviceId, CAPACITY],
+  );
+  return rows
+    .map(r => ({ db: r.db, timestamp: Number(r.ts), level: r.level }))
+    .reverse();
 }
 
-function getLast(deviceId) {
-  const b = buffers.get(deviceId);
-  if (!b || b.size === 0) return null;
-  return b.buf[(b.head - 1 + CAPACITY) % CAPACITY];
+// Última leitura de cada dispositivo: { [deviceId]: { db, level, timestamp } }.
+async function getLatestAll() {
+  const { rows } = await pool.query(`
+    SELECT DISTINCT ON (device_id) device_id, db, level, ts
+    FROM readings
+    ORDER BY device_id, ts DESC
+  `);
+  const map = {};
+  for (const r of rows) {
+    map[r.device_id] = { db: r.db, level: r.level, timestamp: Number(r.ts) };
+  }
+  return map;
 }
 
-function getStats(deviceId) {
-  const all = getAll(deviceId);
-  if (all.length === 0) return { avg: 0, peak: 0, current: 0 };
-  const values = all.map(p => p.db);
-  const avg = values.reduce((a, b) => a + b, 0) / values.length;
-  const peak = Math.max(...values);
-  const current = values[values.length - 1];
-  return { avg: +avg.toFixed(1), peak: +peak.toFixed(1), current: +current.toFixed(1) };
-}
-
-module.exports = { add, getAll, getLast, getStats, emitter };
+module.exports = { add, getAll, getLatestAll, emitter };

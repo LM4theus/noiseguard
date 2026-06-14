@@ -1,7 +1,7 @@
 // Tela 2 — Detalhe do ambiente (planta baixa).
 import {
-  loadRegistry, getEnvironment, getOrganization, typeLabel,
-  deviceDb, band, simulateStep,
+  loadRegistry, refreshReadings, getEnvironment, getOrganization, typeLabel,
+  deviceDb, band,
 } from './data.js';
 
 const params = new URLSearchParams(location.search);
@@ -43,23 +43,25 @@ let env = null;
     backLink.href = `organization.html?id=${org.id}`;
   }
 
+  await refreshReadings();
   render();
-  setInterval(() => { simulateStep(); render(); }, 2000);
+  setInterval(async () => { await refreshReadings(); render(); }, 2000);
 })();
 
 function render() {
   grid.innerHTML = '';
 
   for (const device of env.devices) {
-    const db  = deviceDb(device);
-    const cls = band(db);
+    const db = deviceDb(device);
+    const hasData = db != null;
+    const cls = hasData ? band(db) : 'nd';
 
     const a = document.createElement('a');
     a.className = `floor-card ${cls}`;
     a.href = `device.html?id=${device.id}`;
     a.innerHTML = `
       <div class="floor-name">${device.name}</div>
-      <div class="floor-db"><span>${Math.round(db)}</span><small>dB</small></div>
+      <div class="floor-db"><span>${hasData ? Math.round(db) : '—'}</span><small>dB</small></div>
       <span class="band-dot ${cls}"></span>
     `;
     grid.appendChild(a);

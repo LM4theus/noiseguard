@@ -1,9 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const reg = require('../registry');
+const ah = require('../async-handler');
 
 const TYPES = ['school', 'industrial', 'office', 'hospital'];
 
+// Validação de formato (sem banco). Existência da organização é checada no handler.
 function validate(body, { partial = false } = {}) {
   const errors = [];
   const out = {};
@@ -25,14 +27,13 @@ function validate(body, { partial = false } = {}) {
   }
 
   if (!partial || 'orgId' in body) {
-    if (typeof body.orgId !== 'string' || !reg.organizationExists(body.orgId)) {
-      errors.push('Organização inválida');
+    if (typeof body.orgId !== 'string' || !body.orgId) {
+      errors.push('Organização é obrigatória');
     } else {
       out.orgId = body.orgId;
     }
   }
 
-  // Ícone: usa o informado ou deriva do tipo.
   if (typeof body.icon === 'string' && body.icon.trim()) {
     out.icon = body.icon.trim();
   } else if (out.type) {
@@ -43,30 +44,32 @@ function validate(body, { partial = false } = {}) {
 }
 
 // Lista ambientes (opcionalmente filtrados por ?orgId) com contagem de dispositivos.
-router.get('/environments', (req, res) => {
-  const { orgId } = req.query;
-  const list = reg.getRegistry().environments
-    .filter(e => !orgId || e.orgId === orgId)
-    .map(e => ({ ...e, devices: reg.countDevicesByEnv(e.id) }));
-  res.json(list);
-});
+router.get('/environments', ah(async (req, res) => {
+  res.json(await reg.listEnvironmentsWithCounts(req.query.orgId));
+}));
 
-router.post('/environments', (req, res) => {
+router.post('/environments', ah(async (req, res) => {
   const { errors, out } = validate(req.body);
   if (errors.length) return res.status(400).json({ errors });
-  res.status(201).json(reg.addEnvironment(out));
-});
+  if (!(await reg.organizationExists(out.orgId))) {
+    return res.status(400).json({ errors: ['Organização inválida'] });
+  }
+  res.status(201).json(await reg.addEnvironment(out));
+}));
 
-router.put('/environments/:id', (req, res) => {
+router.put('/environments/:id', ah(async (req, res) => {
   const { errors, out } = validate(req.body, { partial: true });
   if (errors.length) return res.status(400).json({ errors });
-  const updated = reg.updateEnvironment(req.params.id, out);
+  if (out.orgId && !(await reg.organizationExists(out.orgId))) {
+    return res.status(400).json({ errors: ['Organização inválida'] });
+  }
+  const updated = await reg.updateEnvironment(req.params.id, out);
   if (!updated) return res.status(404).json({ errors: ['Ambiente não encontrado'] });
   res.json(updated);
-});
+}));
 
-router.delete('/environments/:id', (req, res) => {
-  const r = reg.deleteEnvironment(req.params.id);
+router.delete('/environments/:id', ah(async (req, res) => {
+  const r = await reg.deleteEnvironment(req.params.id);
   if (r.ok) return res.json({ status: 'ok' });
   if (r.code === 409) {
     return res.status(409).json({
@@ -74,6 +77,6 @@ router.delete('/environments/:id', (req, res) => {
     });
   }
   res.status(404).json({ errors: ['Ambiente não encontrado'] });
-});
+}));
 
 module.exports = router;
