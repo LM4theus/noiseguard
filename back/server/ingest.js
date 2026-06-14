@@ -17,16 +17,25 @@ function ingest({ deviceId, db, timestamp }) {
   let thresholds; // undefined => usa limiares padrão em classify
 
   if (deviceId != null && deviceId !== '') {
-    const device = reg.getDevice(deviceId);
+    // O dispositivo envia o id como número (ex.: 10034); o registro guarda
+    // ids como string, então normalizamos para a busca.
+    const key = String(deviceId);
+    const device = reg.getDevice(key);
     if (!device) {
-      return { ok: false, code: 404, error: `deviceId "${deviceId}" não registrado` };
+      return { ok: false, code: 404, error: `deviceId "${key}" não registrado` };
     }
     id = device.id;
     thresholds = { warn: device.warnThreshold, crit: device.critThreshold };
   }
 
+  // timestamp é o momento em que o dispositivo gerou a leitura — usa-se ele
+  // quando válido; caso ausente/ inválido, cai para a hora do servidor.
+  const ts = (typeof timestamp === 'number' && Number.isFinite(timestamp) && timestamp > 0)
+    ? timestamp
+    : Date.now();
+
   const level = classify(db, thresholds);
-  const point = { db, timestamp: timestamp || Date.now(), level };
+  const point = { db, timestamp: ts, level };
   store.add(id, point);
 
   return { ok: true, deviceId: id, point, level };

@@ -39,10 +39,18 @@ Configure o firmware do ESP32 com:
 | URL | `http://<IP_DA_MÁQUINA>:3000/api/noise` |
 | Método | POST |
 | Content-Type | application/json |
-| Body | `{"deviceId": "<DEVICE_ID>", "db": <LEITURA_DO_SENSOR>}` |
+| Body | `{"deviceid": <ID_NUMÉRICO>, "db": <LEITURA>, "timestamp": <EPOCH_MS>}` |
 | Intervalo | 500 ms |
 
-O `deviceId` deve corresponder a um dispositivo cadastrado na tela **⚙️ Dispositivos**. A leitura é roteada para aquele dispositivo e classificada pelos limiares dele. Se o `deviceId` for omitido, a leitura cai no dispositivo virtual `default` (compatibilidade com firmware legado); se for informado mas não existir no registro, a resposta é **404**.
+Exemplo de payload enviado pelo dispositivo:
+
+```json
+{"deviceid":10034,"db":72.4,"timestamp":1700000000000}
+```
+
+- `deviceid` (numérico) deve corresponder a um dispositivo cadastrado na tela **⚙️ Dispositivos** (o id pode ser numérico, ex.: `10034`). Se omitido → dispositivo virtual `default`; se informado e não existir no registro → **404**.
+- `timestamp` é o momento em que o **dispositivo** gerou a leitura (epoch em ms); o servidor armazena esse valor. Se ausente/ inválido, usa a hora do servidor.
+- A leitura é classificada pelos limiares (`warnThreshold`/`critThreshold`) daquele dispositivo.
 
 Para descobrir o IP da máquina na rede Wi-Fi: `ip a` (Linux/Mac) ou `ipconfig` (Windows).
 
@@ -51,8 +59,8 @@ Para descobrir o IP da máquina na rede Wi-Fi: `ip a` (Linux/Mac) ou `ipconfig` 
 ```bash
 curl -X POST http://localhost:3000/api/noise \
   -H "Content-Type: application/json" \
-  -d '{"deviceId": "comp", "db": 97}'
-# {"status":"ok","deviceId":"comp","level":"CRITICO"}
+  -d '{"deviceid": 10034, "db": 72.4, "timestamp": 1700000000000}'
+# {"status":"ok","deviceId":"10034","level":"ATENCAO"}
 ```
 
 ---
@@ -84,10 +92,10 @@ O servidor Express (porta 3000) serve os arquivos de `front/` como arquivos est�
 Fonte (microfone / ESP32 / curl)
         │
         ▼
-POST /api/noise  {"deviceId": "comp", "db": 97.3}
+POST /api/noise  {"deviceid": 10034, "db": 72.4, "timestamp": 1700000000000}
         │
         ▼
-ingest() → resolve deviceId no registro → classify(db, limiares do dispositivo) → "CRITICO"
+ingest() → resolve deviceid no registro → classify(db, limiares do dispositivo) → "ATENCAO"
         │
         ▼
 store.add(deviceId, point)  → buffer circular POR dispositivo (máx. 120 pontos, sem persistência)
@@ -140,10 +148,10 @@ Definida em `server/alerts.js`. Cada dispositivo tem seus próprios limiares (`w
 
 | Endpoint | Método | Descrição |
 | --- | --- | --- |
-| `/api/noise` | POST | Recebe leitura `{ "deviceId": "comp", "db": 97.3 }` (deviceId opcional → `default`) |
+| `/api/noise` | POST | Recebe leitura `{ "deviceid": 10034, "db": 72.4, "timestamp": 1700000000000 }` (deviceid opcional → `default`; timestamp do dispositivo é respeitado) |
 | `/api/history` | GET | Retorna os pontos do dispositivo (`?deviceId=<id>`) |
 | `/api/registry` | GET | Ambientes + dispositivos cadastrados |
 | `/api/devices` | GET/POST | Lista / cria dispositivo |
 | `/api/devices/:id` | PUT/DELETE | Edita / remove dispositivo |
 | `/events` | GET | Server-Sent Events ao vivo (`?deviceId=<id>` para filtrar) |
-| `/ws` | WS | WebSocket — ESP32 envia `{"deviceId": "...", "db": ...}` |
+| `/ws` | WS | WebSocket — ESP32 envia `{"deviceid": 10034, "db": ..., "timestamp": ...}` |

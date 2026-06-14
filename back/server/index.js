@@ -82,9 +82,9 @@ wss.on('connection', (ws, req) => {
     if (ws._isBrowser) return; // browser não ingere leituras
     try {
       const msg = JSON.parse(raw.toString());
-      // deviceId pode vir na mensagem ou na query da conexão.
+      // deviceid pode vir na mensagem (numérico) ou na query da conexão.
       ingest({
-        deviceId: msg.deviceId ?? ws._deviceId,
+        deviceId: msg.deviceid ?? msg.deviceId ?? ws._deviceId,
         db: msg.db,
         timestamp: msg.timestamp,
       });
