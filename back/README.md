@@ -12,9 +12,9 @@ Tudo sobe com Docker Compose (Node + PostgreSQL) a partir da raiz do repositóri
 docker compose up -d --build
 ```
 
-Acesse o dashboard em **<http://localhost:3000>**. O banco é criado e populado
-(seed) automaticamente no primeiro boot; os dados ficam no volume `pgdata` e
-sobrevivem a reinícios.
+Acesse o dashboard em **<http://localhost:3000>**. Ao subir, o serviço `migrate`
+(runner Python) aplica as migrações do banco (schema + seed) antes do servidor
+iniciar; os dados ficam no volume `pgdata` e sobrevivem a reinícios.
 
 ### Popular com dados (simulador de dispositivos)
 
@@ -29,7 +29,32 @@ Para parar tudo: `docker compose down` (ou `down -v` para zerar o banco também)
 
 > **Rodar sem Docker:** é preciso um PostgreSQL acessível e a variável
 > `DATABASE_URL` (ex.: `postgres://noiseguard:noiseguard@localhost:5432/noiseguard`).
-> Então `cd back && npm install && npm start`. O Docker já cuida disso.
+> Aplique as migrações e então suba o servidor:
+> ```bash
+> cd db && pip install -r requirements.txt && python migrate.py   # cria schema + seed
+> cd ../back && npm install && npm start
+> ```
+> O Docker já faz tudo isso automaticamente.
+
+### Migrações do banco
+
+O schema e o seed vivem em migrações SQL versionadas, aplicadas por um runner
+Python idempotente:
+
+```text
+db/
+  migrate.py                    ← aplica migrações pendentes; registra em schema_migrations
+  migrations/
+    0001_initial_schema.sql
+    0002_seed_demo_data.sql
+  Dockerfile / requirements.txt ← imagem do serviço "migrate" (one-shot)
+```
+
+- A tabela `schema_migrations` registra tudo que já foi aplicado; reexecutar não
+  reaplica nada (idempotente). Subir o container do zero aplica todas em ordem.
+- **Nova migração:** crie `db/migrations/NNNN_descricao.sql` (número seguinte). Ela
+  será aplicada no próximo `docker compose up` (ou `python db/migrate.py`).
+- O servidor Node **não** cria mais o schema — isso é responsabilidade das migrações.
 
 ### Capturar áudio pelo microfone
 
@@ -76,14 +101,15 @@ curl -X POST http://localhost:3000/api/noise \
 ### Arquitetura geral
 
 ```text
-docker-compose.yml ← db (PostgreSQL) + server + simulator (perfil dev)
+docker-compose.yml ← db (PostgreSQL) + migrate (one-shot) + server + simulator (dev)
+db/                ← migrações (runner Python idempotente)
+  migrate.py
+  migrations/*.sql
 back/
   Dockerfile
   server/
-    index.js        ← Express + WebSocket + SSE (init do banco no boot)
-    db/
-      pool.js       ← conexão com o Postgres (DATABASE_URL)
-      init.js       ← cria o schema e faz o seed inicial (idempotente)
+    index.js        ← Express + WebSocket + SSE
+    db/pool.js      ← conexão com o Postgres (DATABASE_URL)
     routes/
       noise.js        ← leituras (/api/noise, /api/history, /api/readings/latest)
       devices.js      ← CRUD de dispositivos (/api/registry, /api/devices)

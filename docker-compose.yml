@@ -17,6 +17,16 @@ services:
       timeout: 3s
       retries: 10
 
+  # Migrações (one-shot): aplica o schema e o seed antes do servidor subir.
+  migrate:
+    build:
+      context: ./db
+    environment:
+      DATABASE_URL: postgres://noiseguard:noiseguard@db:5432/noiseguard
+    depends_on:
+      db:
+        condition: service_healthy
+
   server:
     build:
       context: .
@@ -29,6 +39,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   # Simulador de dispositivos — só sobe com o perfil "dev":
   #   docker compose --profile dev up

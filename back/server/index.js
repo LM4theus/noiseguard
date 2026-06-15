@@ -4,7 +4,6 @@ const express = require('express');
 const WebSocket = require('ws');
 const store = require('./store');
 const { ingest } = require('./ingest');
-const { init } = require('./db/init');
 const noiseRouter = require('./routes/noise');
 const devicesRouter = require('./routes/devices');
 const organizationsRouter = require('./routes/organizations');
@@ -104,14 +103,8 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Erro interno do servidor' });
 });
 
-// Inicializa o banco (schema + seed) e só então começa a aceitar conexões.
-init()
-  .then(() => {
-    server.listen(PORT, () => {
-      console.log(`NoiseGuard server running at http://localhost:${PORT}`);
-    });
-  })
-  .catch((err) => {
-    console.error('Falha ao inicializar o banco de dados:', err);
-    process.exit(1);
-  });
+// O schema/seed é responsabilidade das migrações (db/migrate.py), executadas
+// antes do servidor (serviço "migrate" no docker-compose). Aqui só escutamos.
+server.listen(PORT, () => {
+  console.log(`NoiseGuard server running at http://localhost:${PORT}`);
+});
